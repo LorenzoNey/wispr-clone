@@ -2,8 +2,10 @@
 
 A **cross-platform** speech-to-text application inspired by Wispr Flow. Press **Ctrl+Ctrl** (double-tap) to start/stop speech recognition, and the transcribed text is automatically copied to your clipboard.
 
+[![Latest Release](https://img.shields.io/github/v/release/blockchainadvisors/wispr-clone?label=Latest%20Version&style=for-the-badge)](https://github.com/blockchainadvisors/wispr-clone/releases/latest)
 [![CI](https://github.com/blockchainadvisors/wispr-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/blockchainadvisors/wispr-clone/actions/workflows/ci.yml)
 [![Release](https://github.com/blockchainadvisors/wispr-clone/actions/workflows/release.yml/badge.svg)](https://github.com/blockchainadvisors/wispr-clone/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/github/downloads/blockchainadvisors/wispr-clone/total?label=Downloads)](https://github.com/blockchainadvisors/wispr-clone/releases)
 
 ## Features
 
@@ -19,30 +21,28 @@ A **cross-platform** speech-to-text application inspired by Wispr Flow. Press **
 
 ## Downloads
 
-Download the latest release for your platform from the [Releases](../../releases) page:
+> **[Download Latest Release](https://github.com/blockchainadvisors/wispr-clone/releases/latest)**
 
 | Platform | Architecture | Download |
 |----------|--------------|----------|
-| Windows | x64 | `WisprClone-Windows-x64-*.zip` |
-| Windows | ARM64 | `WisprClone-Windows-arm64-*.zip` |
-| macOS | Intel | `WisprClone-macOS-x64-*.tar.gz` |
-| macOS | Apple Silicon | `WisprClone-macOS-arm64-*.tar.gz` |
-| Linux | x64 | `WisprClone-Linux-x64-*.tar.gz` |
-| Linux | ARM64 | `WisprClone-Linux-arm64-*.tar.gz` |
+| Windows | x64 | [WisprClone-Windows-x64.zip](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
+| Windows | ARM64 | [WisprClone-Windows-arm64.zip](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
+| macOS | Intel | [WisprClone-macOS-x64.tar.gz](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
+| macOS | Apple Silicon | [WisprClone-macOS-arm64.tar.gz](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
+| Linux | x64 | [WisprClone-Linux-x64.tar.gz](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
+| Linux | ARM64 | [WisprClone-Linux-arm64.tar.gz](https://github.com/blockchainadvisors/wispr-clone/releases/latest) |
 
 ## Installation
 
 ### Windows
 
-1. Download `WisprClone-Windows-x64-*.zip` from the [Releases](../../releases) page
-2. Extract the archive
+1. Download the latest Windows release from the [Downloads](#downloads) section above
+2. Extract the ZIP archive
 3. Run `WisprClone.exe`
-
-**Alternative**: Use the Windows installer `WisprClone-Setup-*.exe` if available.
 
 ### macOS
 
-1. Download `WisprClone-macOS-arm64-*.tar.gz` (Apple Silicon) or `WisprClone-macOS-x64-*.tar.gz` (Intel)
+1. Download the latest macOS release (Apple Silicon or Intel) from the [Downloads](#downloads) section
 2. Extract: `tar -xzf WisprClone-macOS-*.tar.gz`
 3. Run: `./WisprClone-macOS-*/WisprClone`
 
@@ -52,9 +52,9 @@ Download the latest release for your platform from the [Releases](../../releases
 
 ### Linux
 
-1. Download `WisprClone-Linux-x64-*.tar.gz`
-2. Extract: `tar -xzf WisprClone-Linux-x64-*.tar.gz`
-3. Run: `./WisprClone-Linux-x64/WisprClone`
+1. Download the latest Linux release from the [Downloads](#downloads) section
+2. Extract: `tar -xzf WisprClone-Linux-*.tar.gz`
+3. Run: `./WisprClone-Linux-*/WisprClone`
 
 **Note**: Global keyboard hooks require X11. Wayland support is limited.
 
