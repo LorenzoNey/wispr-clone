@@ -21,6 +21,8 @@ AllowNoIcons=yes
 ; Output settings
 OutputDir=.\output
 OutputBaseFilename=WisprClone-Setup-{#MyAppVersion}
+; Installer icon
+SetupIconFile=..\..\src\WisprClone.Avalonia\Resources\Icons\app_icon.ico
 ; Compression settings for smaller installer
 Compression=lzma2/ultra64
 SolidCompression=yes
