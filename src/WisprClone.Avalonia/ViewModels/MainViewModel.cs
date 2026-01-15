@@ -93,6 +93,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Create overlay view model
         _overlayViewModel = new OverlayViewModel(_speechService, _settingsService);
+        _overlayViewModel.HideRequested += OnOverlayHideRequested;
 
         // Show overlay if not set to start minimized
         if (!_settingsService.Current.StartMinimized)
@@ -323,8 +324,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            _overlayViewModel?.SavePosition();
             _overlayViewModel?.Hide();
+        });
+    }
+
+    private void OnOverlayHideRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _overlayViewModel?.SavePosition();
             HideOverlayRequested?.Invoke(this, EventArgs.Empty);
         });
     }

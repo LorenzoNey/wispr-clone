@@ -38,6 +38,11 @@ public partial class OverlayViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly AudioLevelMonitor _audioMonitor;
 
+    /// <summary>
+    /// Raised when the overlay requests to be hidden.
+    /// </summary>
+    public event EventHandler? HideRequested;
+
     // Avalonia brush colors
     private static readonly IBrush GrayBrush = new SolidColorBrush(Color.Parse("#808080"));
     private static readonly IBrush YellowBrush = new SolidColorBrush(Color.Parse("#FFFF00"));
@@ -352,6 +357,7 @@ public partial class OverlayViewModel : ViewModelBase
     public void Hide()
     {
         IsVisible = false;
+        HideRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static void DispatchToUI(Action action)
