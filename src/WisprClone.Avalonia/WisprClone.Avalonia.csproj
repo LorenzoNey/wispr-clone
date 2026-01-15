@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WisprClone</AssemblyName>
     <RootNamespace>WisprClone</RootNamespace>
-    <Version>2.3.0</Version>
+    <Version>2.3.1</Version>
     <Authors>WisprClone</Authors>
     <Description>Cross-platform speech-to-text application</Description>
     <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">Resources\Icons\app_icon.ico</ApplicationIcon>

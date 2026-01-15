@@ -383,10 +383,42 @@ public partial class App : Application
         }
     }
 
-    private void OnUpdateMenuClicked()
+    private async void OnUpdateMenuClicked()
     {
-        // Open settings window to show update
-        OnOpenSettingsRequested(this, EventArgs.Empty);
+        if (_updateService == null) return;
+
+        try
+        {
+            // Download directly instead of opening settings
+            var progress = new Progress<double>(p =>
+            {
+                // Update menu item text with progress
+                if (_updateMenuItem != null)
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        _updateMenuItem.Header = $"Downloading... {p:F0}%";
+                    });
+                }
+            });
+
+            var installerPath = await _updateService.DownloadUpdateAsync(progress);
+
+            if (!string.IsNullOrEmpty(installerPath))
+            {
+                _updateService.LaunchInstaller(installerPath);
+            }
+            else
+            {
+                // Fallback to settings if download fails
+                OnOpenSettingsRequested(this, EventArgs.Empty);
+            }
+        }
+        catch
+        {
+            // Fallback to settings on error
+            OnOpenSettingsRequested(this, EventArgs.Empty);
+        }
     }
 
     private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)

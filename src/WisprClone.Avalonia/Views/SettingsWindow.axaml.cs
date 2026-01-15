@@ -90,12 +90,14 @@ public partial class SettingsWindow : Window
         {
             UpdateAvailablePanel.IsVisible = true;
             NoUpdatePanel.IsVisible = false;
+            CheckForUpdatesButton.IsVisible = false;
             NewVersionText.Text = $"v{_updateService.LatestVersion.Major}.{_updateService.LatestVersion.Minor}.{_updateService.LatestVersion.Build}";
         }
         else
         {
             UpdateAvailablePanel.IsVisible = false;
             NoUpdatePanel.IsVisible = true;
+            CheckForUpdatesButton.IsVisible = true;
         }
     }
 

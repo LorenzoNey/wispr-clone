@@ -196,29 +196,26 @@ public class UpdateService : IUpdateService
         if (_latestRelease == null)
             return null;
 
-        // Determine platform
-        string assetPattern;
+        // Determine platform - match asset naming from release workflow
+        string[] assetPatterns;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            assetPattern = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
-                ? "Windows-arm64"
-                : "Windows-x64";
+            // Windows installer is named "WisprClone-Setup-X.X.X.exe"
+            assetPatterns = ["Setup", "Windows-x64"];
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            assetPattern = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
-                ? "macOS-arm64"
-                : "macOS-x64";
+            // macOS DMG is named "WisprClone-macOS-arm64-X.X.X.dmg"
+            assetPatterns = ["macOS-arm64"];
         }
         else // Linux
         {
-            assetPattern = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
-                ? "Linux-arm64"
-                : "Linux-x64";
+            // Linux AppImage is named "WisprClone-Linux-x64-X.X.X.AppImage"
+            assetPatterns = ["Linux-x64"];
         }
 
         var asset = _latestRelease.Assets.FirstOrDefault(a =>
-            a.Name.Contains(assetPattern, StringComparison.OrdinalIgnoreCase));
+            assetPatterns.Any(pattern => a.Name.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
 
         return asset?.BrowserDownloadUrl;
     }
