@@ -37,20 +37,17 @@ class Program
 
     private static void ShowAlreadyRunningMessage()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            // Use Windows MessageBox
-            _ = NativeMethods.MessageBox(
-                IntPtr.Zero,
-                "WisprClone is already running.\n\nCheck the system tray for the existing instance.",
-                "WisprClone",
-                0x00000040 | 0x00000000); // MB_ICONINFORMATION | MB_OK
-        }
-        else
-        {
-            // For other platforms, write to console
-            Console.WriteLine("WisprClone is already running. Check the system tray for the existing instance.");
-        }
+#if WINDOWS
+        // Use Windows MessageBox
+        _ = NativeMethods.MessageBox(
+            IntPtr.Zero,
+            "WisprClone is already running.\n\nCheck the system tray for the existing instance.",
+            "WisprClone",
+            0x00000040 | 0x00000000); // MB_ICONINFORMATION | MB_OK
+#else
+        // For other platforms, write to console
+        Console.WriteLine("WisprClone is already running. Check the system tray for the existing instance.");
+#endif
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
@@ -61,9 +58,11 @@ class Program
             .LogToTrace();
 }
 
+#if WINDOWS
 // Native Windows methods for MessageBox
 internal static partial class NativeMethods
 {
     [System.Runtime.InteropServices.LibraryImport("user32.dll", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf16)]
     public static partial int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 }
+#endif
