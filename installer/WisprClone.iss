@@ -5,7 +5,7 @@
 #define MyAppVersion "1.2.0"
 #define MyAppPublisher "WisprClone"
 #define MyAppExeName "WisprClone.exe"
-#define MyAppDescription "Voice-to-text transcription tool"
+#define MyAppDescription "Cross-platform voice-to-text transcription tool"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -56,7 +56,7 @@ Name: "startupicon"; Description: "Start {#MyAppName} when Windows starts"; Grou
 
 [Files]
 ; Include all files from the publish directory
-Source: "..\src\WisprClone\bin\Release\net8.0-windows\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\src\WisprClone.Avalonia\bin\Release\net8.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Start Menu icons

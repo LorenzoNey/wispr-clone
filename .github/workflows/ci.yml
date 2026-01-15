@@ -29,17 +29,8 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies (Avalonia)
+      - name: Restore dependencies
         run: dotnet restore src/WisprClone.Avalonia/WisprClone.Avalonia.csproj
 
-      - name: Build Avalonia project
+      - name: Build
         run: dotnet build src/WisprClone.Avalonia/WisprClone.Avalonia.csproj -c Release --no-restore
-
-      # Only build WPF project on Windows
-      - name: Restore dependencies (WPF - Windows only)
-        if: runner.os == 'Windows'
-        run: dotnet restore src/WisprClone/WisprClone.csproj
-
-      - name: Build WPF project (Windows only)
-        if: runner.os == 'Windows'
-        run: dotnet build src/WisprClone/WisprClone.csproj -c Release --no-restore

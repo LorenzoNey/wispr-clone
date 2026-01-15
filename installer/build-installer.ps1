@@ -20,7 +20,7 @@ $ErrorActionPreference = "Stop"
 # Get script directory
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $rootDir = Split-Path -Parent $scriptDir
-$projectDir = Join-Path $rootDir "src\WisprClone"
+$projectDir = Join-Path $rootDir "src\WisprClone.Avalonia"
 $outputDir = Join-Path $scriptDir "output"
 
 # Inno Setup compiler path (default installation location)
@@ -141,7 +141,7 @@ else {
 }
 
 # Verify publish output exists
-$publishDir = Join-Path $projectDir "bin\Release\net8.0-windows\win-x64\publish"
+$publishDir = Join-Path $projectDir "bin\Release\net8.0\win-x64\publish"
 if (-not (Test-Path $publishDir)) {
     Write-Host ""
     Write-Host "ERROR: Publish directory not found at:" -ForegroundColor Red

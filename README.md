@@ -134,14 +134,11 @@ Actions:
 git clone https://github.com/blockchainadvisors/wispr-clone.git
 cd wispr-clone
 
-# Build cross-platform Avalonia version
-dotnet build src/WisprClone.Avalonia/WisprClone.Avalonia.csproj
+# Build the project
+dotnet build
 
 # Run the application
 dotnet run --project src/WisprClone.Avalonia/WisprClone.Avalonia.csproj
-
-# Build Windows-only WPF version (Windows only)
-dotnet build src/WisprClone/WisprClone.csproj
 ```
 
 ### Publish for Release
@@ -201,7 +198,6 @@ wispr-clone/
 ├── README.md                   # This file
 ├── installer/                  # Windows installer (Inno Setup)
 ├── src/
-│   ├── WisprClone/             # Original WPF version (Windows only)
 │   └── WisprClone.Avalonia/    # Cross-platform Avalonia version
 │       ├── Core/               # Core types (states, events, constants)
 │       ├── Infrastructure/     # Keyboard hooks (SharpHook)
