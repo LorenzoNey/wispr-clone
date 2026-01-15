@@ -89,7 +89,7 @@ jobs:
           path: ./${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}${{ matrix.asset_extension }}
           retention-days: 1
 
-  build-installer:
+  build-windows-installer:
     runs-on: windows-latest
 
     steps:
@@ -147,8 +147,194 @@ jobs:
           path: installer/output/WisprClone-Setup-*.exe
           retention-days: 1
 
+  build-macos-dmg:
+    strategy:
+      matrix:
+        include:
+          - rid: osx-x64
+            arch: x64
+            artifact_name: WisprClone-macOS-x64
+          - rid: osx-arm64
+            arch: arm64
+            artifact_name: WisprClone-macOS-arm64
+
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish application
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o ./publish/WisprClone.app/Contents/MacOS
+
+      - name: Create app bundle structure
+        run: |
+          mkdir -p ./publish/WisprClone.app/Contents/Resources
+
+          # Create Info.plist
+          cat > ./publish/WisprClone.app/Contents/Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>WisprClone</string>
+              <key>CFBundleDisplayName</key>
+              <string>WisprClone</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.blockchainadvisors.wisprclone</string>
+              <key>CFBundleVersion</key>
+              <string>${{ steps.version.outputs.VERSION }}</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${{ steps.version.outputs.VERSION }}</string>
+              <key>CFBundleExecutable</key>
+              <string>WisprClone</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.15</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSMicrophoneUsageDescription</key>
+              <string>WisprClone needs microphone access for speech recognition.</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Make executable
+          chmod +x ./publish/WisprClone.app/Contents/MacOS/WisprClone
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "WisprClone" \
+            --volicon "src/WisprClone.Avalonia/Resources/Icons/app_icon.ico" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "WisprClone.app" 150 190 \
+            --hide-extension "WisprClone.app" \
+            --app-drop-link 450 190 \
+            "${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}.dmg" \
+            "./publish/WisprClone.app" || true
+
+          # Fallback if create-dmg fails (e.g., no icon)
+          if [ ! -f "${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}.dmg" ]; then
+            hdiutil create -volname "WisprClone" -srcfolder ./publish/WisprClone.app -ov -format UDZO "${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}.dmg"
+          fi
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-DMG
+          path: ${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}.dmg
+          retention-days: 1
+
+  build-linux-appimage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish application
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o ./AppDir/usr/bin
+
+      - name: Create AppDir structure
+        run: |
+          mkdir -p ./AppDir/usr/share/applications
+          mkdir -p ./AppDir/usr/share/icons/hicolor/256x256/apps
+
+          # Copy desktop file
+          cp installer/linux/WisprClone.desktop ./AppDir/usr/share/applications/
+          cp installer/linux/WisprClone.desktop ./AppDir/
+
+          # Copy icon (convert ico to png if needed, or use existing png)
+          if [ -f "src/WisprClone.Avalonia/Resources/Icons/app_icon_256.png" ]; then
+            cp src/WisprClone.Avalonia/Resources/Icons/app_icon_256.png ./AppDir/usr/share/icons/hicolor/256x256/apps/wisprclone.png
+            cp src/WisprClone.Avalonia/Resources/Icons/app_icon_256.png ./AppDir/wisprclone.png
+          fi
+
+          # Create AppRun script
+          cat > ./AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/WisprClone" "$@"
+          EOF
+          chmod +x ./AppDir/AppRun
+
+      - name: Build AppImage
+        run: |
+          ARCH=x86_64 ./appimagetool ./AppDir WisprClone-Linux-x64-${{ steps.version.outputs.VERSION }}.AppImage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WisprClone-Linux-AppImage
+          path: WisprClone-Linux-x64-${{ steps.version.outputs.VERSION }}.AppImage
+          retention-days: 1
+
   release:
-    needs: [build, build-installer]
+    needs: [build, build-windows-installer, build-macos-dmg, build-linux-appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -180,6 +366,8 @@ jobs:
             ./artifacts/**/*.zip
             ./artifacts/**/*.tar.gz
             ./artifacts/**/*.exe
+            ./artifacts/**/*.dmg
+            ./artifacts/**/*.AppImage
           body: |
             ## WisprClone v${{ steps.version.outputs.VERSION }}
 
@@ -187,34 +375,44 @@ jobs:
 
             ### Downloads
 
+            #### Installers (Recommended)
+
             | Platform | Architecture | Download |
             |----------|--------------|----------|
-            | **Windows Installer** | x64 | `WisprClone-Setup-${{ steps.version.outputs.VERSION }}.exe` |
+            | **Windows** | x64 | `WisprClone-Setup-${{ steps.version.outputs.VERSION }}.exe` |
+            | **macOS** | Apple Silicon | `WisprClone-macOS-arm64-${{ steps.version.outputs.VERSION }}.dmg` |
+            | **macOS** | Intel | `WisprClone-macOS-x64-${{ steps.version.outputs.VERSION }}.dmg` |
+            | **Linux** | x64 | `WisprClone-Linux-x64-${{ steps.version.outputs.VERSION }}.AppImage` |
+
+            #### Portable Archives
+
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
             | Windows | x64 | `WisprClone-Windows-x64-${{ steps.version.outputs.VERSION }}.zip` |
             | Windows | ARM64 | `WisprClone-Windows-arm64-${{ steps.version.outputs.VERSION }}.zip` |
-            | macOS | Intel (x64) | `WisprClone-macOS-x64-${{ steps.version.outputs.VERSION }}.tar.gz` |
-            | macOS | Apple Silicon (ARM64) | `WisprClone-macOS-arm64-${{ steps.version.outputs.VERSION }}.tar.gz` |
+            | macOS | Intel | `WisprClone-macOS-x64-${{ steps.version.outputs.VERSION }}.tar.gz` |
+            | macOS | Apple Silicon | `WisprClone-macOS-arm64-${{ steps.version.outputs.VERSION }}.tar.gz` |
             | Linux | x64 | `WisprClone-Linux-x64-${{ steps.version.outputs.VERSION }}.tar.gz` |
             | Linux | ARM64 | `WisprClone-Linux-arm64-${{ steps.version.outputs.VERSION }}.tar.gz` |
 
             ### Installation
 
-            #### Windows (Recommended)
+            #### Windows
             Download and run `WisprClone-Setup-${{ steps.version.outputs.VERSION }}.exe` for a full installation with Start Menu shortcuts and uninstaller.
 
-            #### Portable / Other Platforms
-            1. Download the appropriate archive for your platform
-            2. Extract the archive
-            3. Run `WisprClone` (or `WisprClone.exe` on Windows)
+            #### macOS
+            1. Download the `.dmg` file for your Mac (Apple Silicon or Intel)
+            2. Open the DMG and drag WisprClone to Applications
+            3. On first launch, grant Accessibility and Microphone permissions
 
-            ### macOS Note
+            #### Linux
+            1. Download the `.AppImage` file
+            2. Make it executable: `chmod +x WisprClone-*.AppImage`
+            3. Run it: `./WisprClone-*.AppImage`
 
-            On first launch, macOS will require you to grant:
-            - **Accessibility** permission (System Preferences > Security & Privacy > Privacy > Accessibility)
-            - **Microphone** permission (granted on first use)
+            ### Notes
 
-            ### Linux Note
-
-            On Linux (X11), you may need to install additional dependencies for global keyboard hooks.
+            - **macOS**: Requires Accessibility permission (System Preferences > Security & Privacy > Privacy > Accessibility)
+            - **Linux**: Requires X11 desktop environment. AppImage needs FUSE to run.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

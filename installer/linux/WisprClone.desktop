@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WisprClone
+Comment=Cross-platform speech-to-text application
+Exec=WisprClone
+Icon=wisprclone
+Categories=AudioVideo;Audio;Utility;
+Terminal=false
+StartupNotify=true
