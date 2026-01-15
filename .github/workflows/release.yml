@@ -130,7 +130,7 @@ jobs:
       - name: Update installer version
         shell: pwsh
         run: |
-          $issPath = "installer/WisprClone.iss"
+          $issPath = "installer/windows/WisprClone.iss"
           $content = Get-Content $issPath -Raw
           $content = $content -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ steps.version.outputs.VERSION }}"'
           Set-Content $issPath $content
@@ -138,13 +138,13 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/WisprClone.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/WisprClone.iss
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: WisprClone-Windows-Installer
-          path: installer/output/WisprClone-Setup-*.exe
+          path: installer/windows/output/WisprClone-Setup-*.exe
           retention-days: 1
 
   build-macos-dmg:

@@ -56,7 +56,7 @@ Name: "startupicon"; Description: "Start {#MyAppName} when Windows starts"; Grou
 
 [Files]
 ; Include all files from the publish directory
-Source: "..\src\WisprClone.Avalonia\bin\Release\net8.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\src\WisprClone.Avalonia\bin\Release\net8.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Start Menu icons
