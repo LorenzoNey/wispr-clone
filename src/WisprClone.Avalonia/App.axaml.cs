@@ -44,6 +44,12 @@ public partial class App : Application
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
 
+        // Subscribe to shutdown event to properly dispose resources
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.ShutdownRequested += OnShutdownRequested;
+        }
+
         // Initialize main view model
         _mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
 
@@ -332,6 +338,33 @@ public partial class App : Application
     {
         // Open settings window to show update
         OnOpenSettingsRequested(this, EventArgs.Empty);
+    }
+
+    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+    {
+        Log("Shutdown requested - disposing resources...");
+
+        try
+        {
+            // Dispose update service
+            _updateService?.Dispose();
+
+            // Dispose main view model (this disposes keyboard hook, speech services, etc.)
+            _mainViewModel?.Dispose();
+
+            // Remove tray icon
+            if (_trayIcon != null)
+            {
+                _trayIcon.IsVisible = false;
+                _trayIcon.Dispose();
+            }
+
+            Log("Resources disposed successfully");
+        }
+        catch (Exception ex)
+        {
+            Log($"Error during shutdown: {ex.Message}");
+        }
     }
 
     private Stream GetIconStream(string iconName)
