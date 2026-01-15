@@ -41,6 +41,9 @@ public class AppSettings
     // Recording Limits
     public int MaxRecordingDurationSeconds { get; set; } = 120; // 2 minutes default
 
+    // Update Settings
+    public bool CheckForUpdatesAutomatically { get; set; } = true;
+
     // Debugging
     public bool EnableLogging { get; set; } = false;
 }

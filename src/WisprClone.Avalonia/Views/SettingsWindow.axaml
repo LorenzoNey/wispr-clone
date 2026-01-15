@@ -228,6 +228,78 @@
                            Classes="info"
                            Margin="0,4,0,0"/>
 
+                <!-- Updates -->
+                <TextBlock Text="Updates" Classes="sectionHeader"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Current Version:"
+                               Foreground="#FFB0B0B0"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <TextBlock x:Name="CurrentVersionText"
+                               Text="v2.0.0"
+                               Foreground="#FFE0E0E0"
+                               FontSize="12"
+                               FontWeight="Medium"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel x:Name="UpdateAvailablePanel" IsVisible="False" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="New Version Available:"
+                                   Foreground="#FF4CAF50"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <TextBlock x:Name="NewVersionText"
+                                   Text="v2.1.0"
+                                   Foreground="#FF4CAF50"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Button x:Name="DownloadUpdateButton"
+                            Content="Download Update"
+                            Classes="primary"
+                            Click="DownloadUpdateButton_Click"
+                            HorizontalAlignment="Left"
+                            Margin="0,4,0,0"/>
+
+                    <ProgressBar x:Name="DownloadProgressBar"
+                                 IsVisible="False"
+                                 Value="0"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Height="4"
+                                 Margin="0,8,0,0"
+                                 Background="#FF404040"
+                                 Foreground="#FF4CAF50"/>
+
+                    <TextBlock x:Name="DownloadStatusText"
+                               Text=""
+                               Classes="info"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <StackPanel x:Name="NoUpdatePanel" IsVisible="True" Margin="0,0,0,8">
+                    <TextBlock Text="You have the latest version."
+                               Foreground="#FF808080"
+                               FontSize="11"/>
+                </StackPanel>
+
+                <CheckBox x:Name="AutoCheckUpdatesCheckBox"
+                          Content="Check for updates automatically"
+                          Classes="settings"
+                          Margin="0,4,0,0"/>
+
+                <Button Content="Check Now"
+                        Classes="secondary"
+                        Click="CheckForUpdatesButton_Click"
+                        HorizontalAlignment="Left"
+                        Margin="0,12,0,0"/>
+
                 <!-- About -->
                 <TextBlock Text="About" Classes="sectionHeader"/>
 

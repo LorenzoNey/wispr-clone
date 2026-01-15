@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using WisprClone.Core;
 using WisprClone.Services.Interfaces;
 
@@ -11,6 +12,7 @@ namespace WisprClone.Views;
 public partial class SettingsWindow : Window
 {
     private readonly ISettingsService _settingsService;
+    private readonly IUpdateService? _updateService;
 
     public SettingsWindow()
     {
@@ -18,11 +20,13 @@ public partial class SettingsWindow : Window
         _settingsService = null!; // Will be set via property
     }
 
-    public SettingsWindow(ISettingsService settingsService)
+    public SettingsWindow(ISettingsService settingsService, IUpdateService? updateService = null)
     {
         InitializeComponent();
         _settingsService = settingsService;
+        _updateService = updateService;
         LoadSettings();
+        LoadUpdateStatus();
     }
 
     private void LoadSettings()
@@ -65,8 +69,34 @@ public partial class SettingsWindow : Window
         // Debugging
         EnableLoggingCheckBox.IsChecked = settings.EnableLogging;
 
+        // Update settings
+        AutoCheckUpdatesCheckBox.IsChecked = settings.CheckForUpdatesAutomatically;
+
         // Update offline provider visibility based on platform
         UpdateProviderVisibility();
+    }
+
+    private void LoadUpdateStatus()
+    {
+        // Set current version
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        if (version != null)
+        {
+            CurrentVersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
+        }
+
+        // Check if update service available and has update
+        if (_updateService != null && _updateService.IsUpdateAvailable && _updateService.LatestVersion != null)
+        {
+            UpdateAvailablePanel.IsVisible = true;
+            NoUpdatePanel.IsVisible = false;
+            NewVersionText.Text = $"v{_updateService.LatestVersion.Major}.{_updateService.LatestVersion.Minor}.{_updateService.LatestVersion.Build}";
+        }
+        else
+        {
+            UpdateAvailablePanel.IsVisible = false;
+            NoUpdatePanel.IsVisible = true;
+        }
     }
 
     private void UpdateProviderVisibility()
@@ -161,9 +191,70 @@ public partial class SettingsWindow : Window
 
             // Debugging
             settings.EnableLogging = EnableLoggingCheckBox.IsChecked ?? false;
+
+            // Update settings
+            settings.CheckForUpdatesAutomatically = AutoCheckUpdatesCheckBox.IsChecked ?? true;
         });
 
         Close();
+    }
+
+    private async void CheckForUpdatesButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_updateService == null) return;
+
+        NoUpdatePanel.IsVisible = false;
+        UpdateAvailablePanel.IsVisible = false;
+
+        var hasUpdate = await _updateService.CheckForUpdatesAsync();
+        LoadUpdateStatus();
+
+        if (!hasUpdate)
+        {
+            NoUpdatePanel.IsVisible = true;
+        }
+    }
+
+    private async void DownloadUpdateButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_updateService == null) return;
+
+        DownloadUpdateButton.IsEnabled = false;
+        DownloadProgressBar.IsVisible = true;
+        DownloadProgressBar.Value = 0;
+        DownloadStatusText.Text = "Starting download...";
+
+        var progress = new Progress<double>(p =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                DownloadProgressBar.Value = p;
+                DownloadStatusText.Text = $"Downloading... {p:F0}%";
+            });
+        });
+
+        try
+        {
+            var filePath = await _updateService.DownloadUpdateAsync(progress);
+            if (filePath != null)
+            {
+                DownloadStatusText.Text = "Download complete! Opening...";
+                DownloadProgressBar.Value = 100;
+                _updateService.LaunchInstaller(filePath);
+            }
+            else
+            {
+                DownloadStatusText.Text = "Download failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            DownloadStatusText.Text = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            DownloadUpdateButton.IsEnabled = true;
+        }
     }
 
     private bool ValidateInputs()

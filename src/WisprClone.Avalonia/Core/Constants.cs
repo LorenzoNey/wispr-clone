@@ -49,4 +49,19 @@ public static class Constants
     /// Maximum allowed maximum recording duration in seconds (10 minutes).
     /// </summary>
     public const int MaxMaxRecordingDurationSeconds = 600;
+
+    /// <summary>
+    /// GitHub repository owner.
+    /// </summary>
+    public const string GitHubOwner = "blockchainadvisors";
+
+    /// <summary>
+    /// GitHub repository name.
+    /// </summary>
+    public const string GitHubRepo = "wispr-clone";
+
+    /// <summary>
+    /// Default update check interval in hours.
+    /// </summary>
+    public const int DefaultUpdateCheckIntervalHours = 6;
 }

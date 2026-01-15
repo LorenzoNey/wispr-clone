@@ -3,10 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
+using WisprClone.Core;
 using WisprClone.Infrastructure.Keyboard;
+using WisprClone.Models;
 using WisprClone.Services;
 using WisprClone.Services.Interfaces;
 using WisprClone.Services.Speech;
@@ -24,6 +27,10 @@ public partial class App : Application
     private OverlayWindow? _overlayWindow;
     private SettingsWindow? _settingsWindow;
     private AboutWindow? _aboutWindow;
+    private NativeMenuItem? _updateMenuItem;
+    private NativeMenuItemSeparator? _updateSeparator;
+    private IUpdateService? _updateService;
+    private bool _updateAvailable;
 
     public override void Initialize()
     {
@@ -69,7 +76,79 @@ public partial class App : Application
         // Setup system tray
         SetupTrayIcon();
 
+        // Initialize update checking
+        InitializeUpdateChecking();
+
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void InitializeUpdateChecking()
+    {
+        _updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+        _updateService.UpdateAvailable += OnUpdateAvailable;
+
+        var settings = _serviceProvider.GetRequiredService<ISettingsService>();
+        if (settings.Current.CheckForUpdatesAutomatically)
+        {
+            // Check for updates on startup (fire and forget)
+            _ = _updateService.CheckForUpdatesAsync();
+
+            // Start periodic checks
+            _updateService.StartPeriodicChecks(TimeSpan.FromHours(Constants.DefaultUpdateCheckIntervalHours));
+        }
+    }
+
+    private void OnUpdateAvailable(object? sender, UpdateAvailableEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _updateAvailable = true;
+
+            // Show update menu item
+            if (_updateMenuItem != null)
+            {
+                _updateMenuItem.Header = $"Update Available (v{e.LatestVersion.Major}.{e.LatestVersion.Minor}.{e.LatestVersion.Build})";
+                _updateMenuItem.IsVisible = true;
+            }
+            if (_updateSeparator != null)
+            {
+                _updateSeparator.IsVisible = true;
+            }
+
+            // Update tray icon to show update indicator
+            UpdateTrayIconForState();
+
+            // Update tooltip
+            if (_trayIcon != null)
+            {
+                _trayIcon.ToolTipText = $"WisprClone - Update Available (v{e.LatestVersion.Major}.{e.LatestVersion.Minor}.{e.LatestVersion.Build})";
+            }
+        });
+    }
+
+    private void UpdateTrayIconForState()
+    {
+        if (_trayIcon == null) return;
+
+        // Use update icon if available, otherwise fall back to idle
+        var iconName = _updateAvailable ? "tray_idle_update.ico" : "tray_idle.ico";
+
+        try
+        {
+            _trayIcon.Icon = new WindowIcon(GetIconStream(iconName));
+        }
+        catch
+        {
+            // Fallback to regular icon if update icon doesn't exist
+            if (_updateAvailable)
+            {
+                try
+                {
+                    _trayIcon.Icon = new WindowIcon(GetIconStream("tray_idle.ico"));
+                }
+                catch { }
+            }
+        }
     }
 
     private void OnShowOverlayRequested(object? sender, EventArgs e)
@@ -91,7 +170,8 @@ public partial class App : Application
         }
 
         var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-        _settingsWindow = new SettingsWindow(settingsService);
+        var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+        _settingsWindow = new SettingsWindow(settingsService, updateService);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
     }
@@ -119,6 +199,9 @@ public partial class App : Application
 
         // Global keyboard hook (cross-platform via SharpHook)
         services.AddSingleton<IGlobalKeyboardHook, SharpHookKeyboardHook>();
+
+        // Update service
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // Speech services
         services.AddSingleton<AzureSpeechRecognitionService>();
@@ -222,6 +305,16 @@ public partial class App : Application
 
         menu.Items.Add(new NativeMenuItemSeparator());
 
+        // Update menu item (hidden until update is available)
+        _updateMenuItem = new NativeMenuItem("Update Available");
+        _updateMenuItem.Click += (_, _) => OnUpdateMenuClicked();
+        _updateMenuItem.IsVisible = false;
+        menu.Items.Add(_updateMenuItem);
+
+        _updateSeparator = new NativeMenuItemSeparator();
+        _updateSeparator.IsVisible = false;
+        menu.Items.Add(_updateSeparator);
+
         var exitItem = new NativeMenuItem("Exit");
         exitItem.Click += (_, _) =>
         {
@@ -233,6 +326,12 @@ public partial class App : Application
         menu.Items.Add(exitItem);
 
         return menu;
+    }
+
+    private void OnUpdateMenuClicked()
+    {
+        // Open settings window to show update
+        OnOpenSettingsRequested(this, EventArgs.Empty);
     }
 
     private Stream GetIconStream(string iconName)
