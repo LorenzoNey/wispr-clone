@@ -159,40 +159,72 @@ public partial class App : Application
 
     private void OnShowOverlayRequested(object? sender, EventArgs e)
     {
-        _overlayWindow?.Show();
+        try
+        {
+            if (_overlayWindow != null)
+            {
+                _overlayWindow.Show();
+                _overlayWindow.Activate();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Error showing overlay: {ex.Message}");
+        }
     }
 
     private void OnHideOverlayRequested(object? sender, EventArgs e)
     {
-        _overlayWindow?.Hide();
+        try
+        {
+            _overlayWindow?.Hide();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error hiding overlay: {ex.Message}");
+        }
     }
 
     private void OnOpenSettingsRequested(object? sender, EventArgs e)
     {
-        if (_settingsWindow != null && _settingsWindow.IsVisible)
+        try
         {
-            _settingsWindow.Activate();
-            return;
-        }
+            if (_settingsWindow != null && _settingsWindow.IsVisible)
+            {
+                _settingsWindow.Activate();
+                return;
+            }
 
-        var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-        var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
-        _settingsWindow = new SettingsWindow(settingsService, updateService);
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-        _settingsWindow.Show();
+            var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
+            var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+            _settingsWindow = new SettingsWindow(settingsService, updateService);
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error opening settings: {ex.Message}");
+        }
     }
 
     private void OnOpenAboutRequested(object? sender, EventArgs e)
     {
-        if (_aboutWindow != null && _aboutWindow.IsVisible)
+        try
         {
-            _aboutWindow.Activate();
-            return;
-        }
+            if (_aboutWindow != null && _aboutWindow.IsVisible)
+            {
+                _aboutWindow.Activate();
+                return;
+            }
 
-        _aboutWindow = new AboutWindow();
-        _aboutWindow.Closed += (_, _) => _aboutWindow = null;
-        _aboutWindow.Show();
+            _aboutWindow = new AboutWindow();
+            _aboutWindow.Closed += (_, _) => _aboutWindow = null;
+            _aboutWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error opening about: {ex.Message}");
+        }
     }
 
     private void ConfigureServices(IServiceCollection services)
@@ -292,28 +324,28 @@ public partial class App : Application
         var menu = new NativeMenu();
 
         var showItem = new NativeMenuItem("Show Overlay");
-        showItem.Click += (_, _) => viewModel.ShowOverlayCommand.Execute(null);
+        showItem.Click += (_, _) => SafeExecute(() => viewModel.ShowOverlayCommand.Execute(null), "Show Overlay");
         menu.Items.Add(showItem);
 
         var hideItem = new NativeMenuItem("Hide Overlay");
-        hideItem.Click += (_, _) => viewModel.HideOverlayCommand.Execute(null);
+        hideItem.Click += (_, _) => SafeExecute(() => viewModel.HideOverlayCommand.Execute(null), "Hide Overlay");
         menu.Items.Add(hideItem);
 
         menu.Items.Add(new NativeMenuItemSeparator());
 
         var settingsItem = new NativeMenuItem("Settings...");
-        settingsItem.Click += (_, _) => viewModel.OpenSettingsCommand.Execute(null);
+        settingsItem.Click += (_, _) => SafeExecute(() => viewModel.OpenSettingsCommand.Execute(null), "Open Settings");
         menu.Items.Add(settingsItem);
 
         var aboutItem = new NativeMenuItem("About...");
-        aboutItem.Click += (_, _) => viewModel.OpenAboutCommand.Execute(null);
+        aboutItem.Click += (_, _) => SafeExecute(() => viewModel.OpenAboutCommand.Execute(null), "Open About");
         menu.Items.Add(aboutItem);
 
         menu.Items.Add(new NativeMenuItemSeparator());
 
         // Update menu item (hidden until update is available)
         _updateMenuItem = new NativeMenuItem("Update Available");
-        _updateMenuItem.Click += (_, _) => OnUpdateMenuClicked();
+        _updateMenuItem.Click += (_, _) => SafeExecute(() => OnUpdateMenuClicked(), "Update");
         _updateMenuItem.IsVisible = false;
         menu.Items.Add(_updateMenuItem);
 
@@ -332,6 +364,23 @@ public partial class App : Application
         menu.Items.Add(exitItem);
 
         return menu;
+    }
+
+    private void SafeExecute(Action action, string actionName)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error in {actionName}: {ex.Message}");
+            // Re-establish tray icon visibility in case it was lost
+            if (_trayIcon != null)
+            {
+                _trayIcon.IsVisible = true;
+            }
+        }
     }
 
     private void OnUpdateMenuClicked()
