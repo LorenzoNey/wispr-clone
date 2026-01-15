@@ -64,7 +64,7 @@ appsettings.*.json
 publish/
 
 # Installer outputs (built installers are large binaries)
-installer/output/*.exe
+installer/output/
 
 # Test results
 [Tt]est[Rr]esult*/
