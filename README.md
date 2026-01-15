@@ -194,7 +194,6 @@ wispr-clone/
 │   └── workflows/
 │       ├── ci.yml              # CI build on push/PR
 │       └── release.yml         # Release workflow on tag push
-├── WisprClone.sln              # Solution file
 ├── README.md                   # This file
 ├── installer/                  # Windows installer (Inno Setup)
 ├── src/
