@@ -108,7 +108,7 @@ public class OpenAIWhisperSpeechRecognitionService : ISpeechRecognitionService
             _transcriptionTimer.Start();
 
             UpdateState(RecognitionState.Listening);
-            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs("Listening...", false));
+            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs("Listening...", false, false));
 
             Log("Started recording with progressive full-audio transcription");
         }
@@ -192,7 +192,8 @@ public class OpenAIWhisperSpeechRecognitionService : ISpeechRecognitionService
             {
                 _lastTranscription = fullText;
                 Log($"Full transcription: '{fullText}'");
-                RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(fullText, false));
+                // Whisper re-transcribes entire audio, so each update is finalized
+                RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(fullText, false, true));
             }
         }
         catch (Exception ex)

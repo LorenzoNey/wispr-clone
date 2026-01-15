@@ -143,8 +143,9 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
 
         if (e.Result.Reason == ResultReason.RecognizingSpeech)
         {
+            // Interim hypothesis - show in UI but don't copy to clipboard
             var currentText = _transcriptionBuffer.ToString() + e.Result.Text;
-            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(currentText, false));
+            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(currentText, false, false));
         }
     }
 
@@ -154,9 +155,10 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
 
         if (e.Result.Reason == ResultReason.RecognizedSpeech)
         {
+            // Finalized segment - append to buffer and copy to clipboard
             _transcriptionBuffer.Append(e.Result.Text + " ");
             RecognitionPartial?.Invoke(this,
-                new TranscriptionEventArgs(_transcriptionBuffer.ToString(), false));
+                new TranscriptionEventArgs(_transcriptionBuffer.ToString(), false, true));
         }
         else if (e.Result.Reason == ResultReason.NoMatch)
         {

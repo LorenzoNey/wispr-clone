@@ -116,7 +116,8 @@ public class OfflineSpeechRecognitionService : ISpeechRecognitionService
             _lastDisplayedText = currentText;
         }
 
-        RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(_lastDisplayedText, false));
+        // Interim hypothesis - show in UI but don't copy to clipboard
+        RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(_lastDisplayedText, false, false));
     }
 
     private void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
@@ -129,7 +130,8 @@ public class OfflineSpeechRecognitionService : ISpeechRecognitionService
             var currentText = _transcriptionBuffer.ToString();
             _lastDisplayedText = currentText;
 
-            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(currentText, false));
+            // Finalized segment - copy to clipboard
+            RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(currentText, false, true));
         }
     }
 

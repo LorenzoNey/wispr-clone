@@ -8,10 +8,18 @@ public class TranscriptionEventArgs : EventArgs
     public string Text { get; }
     public bool IsFinal { get; }
 
-    public TranscriptionEventArgs(string text, bool isFinal)
+    /// <summary>
+    /// Indicates if this update contains a newly finalized segment.
+    /// When true, the text should be copied to clipboard (progressive update).
+    /// When false, this is an interim hypothesis that may change.
+    /// </summary>
+    public bool IsSegmentFinalized { get; }
+
+    public TranscriptionEventArgs(string text, bool isFinal, bool isSegmentFinalized = false)
     {
         Text = text;
         IsFinal = isFinal;
+        IsSegmentFinalized = isSegmentFinalized;
     }
 }
 

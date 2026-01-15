@@ -266,10 +266,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void OnRecognitionPartial(object? sender, TranscriptionEventArgs e)
+    private async void OnRecognitionPartial(object? sender, TranscriptionEventArgs e)
     {
-        // Partial results are displayed in the overlay via OverlayViewModel
-        // Clipboard is only updated on final completion to avoid incomplete text
+        // Update clipboard when a segment is finalized (not interim hypotheses)
+        if (e.IsSegmentFinalized && _settingsService.Current.AutoCopyToClipboard && !string.IsNullOrWhiteSpace(e.Text))
+        {
+            await _clipboardService.SetTextAsync(e.Text);
+        }
     }
 
     private async void OnRecognitionCompleted(object? sender, TranscriptionEventArgs e)
