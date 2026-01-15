@@ -136,6 +136,7 @@ Both OpenAI providers use the same API key.
 - Audio is streamed at 24kHz PCM16 mono format
 - Provides instant transcription as you speak
 - Currently Windows-only (requires NAudio for audio capture)
+- ⚠️ **Cost Warning**: Realtime API costs ~$0.06/min vs Whisper's ~$0.006/min (10x more expensive)
 
 ## Building from Source
 

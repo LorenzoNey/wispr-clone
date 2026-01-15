@@ -74,3 +74,5 @@ installer/output/
 
 # Claude Code settings (user-specific)
 .claude/
+
+nul

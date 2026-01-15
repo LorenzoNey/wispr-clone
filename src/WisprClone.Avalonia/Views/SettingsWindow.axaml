@@ -158,6 +158,8 @@
                            Classes="info"/>
                 <TextBlock Text="Whisper: Re-transcribes entire audio every 2s. Realtime: True streaming via WebSocket."
                            Classes="info" Margin="0,4,0,0"/>
+                <TextBlock Text="⚠ Realtime API costs ~10x more than Whisper ($0.06/min vs $0.006/min)."
+                           Classes="info" Margin="0,4,0,0" Foreground="#FFFFA500"/>
 
                 <!-- Language Settings -->
                 <TextBlock Text="Language" Classes="sectionHeader"/>
