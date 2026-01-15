@@ -114,7 +114,7 @@ Logs (when enabled) are stored in: `%APPDATA%\WisprClone\logs\wispr_YYYY-MM-DD.l
 
 ```bash
 # Clone the repository
-git clone https://github.com/YourUsername/wispr-clone.git
+git clone https://github.com/LorenzoNey/wispr-clone.git
 cd wispr-clone
 
 # Restore NuGet packages
