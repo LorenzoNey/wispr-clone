@@ -1,14 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, master, develop ]
-    tags-ignore:
-      - 'v*'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/*.md'
   pull_request:
     branches: [ main, master, develop ]
     paths-ignore:
