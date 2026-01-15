@@ -89,8 +89,66 @@ jobs:
           path: ./${{ matrix.artifact_name }}-${{ steps.version.outputs.VERSION }}${{ matrix.asset_extension }}
           retention-days: 1
 
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish application for installer
+        shell: pwsh
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Update installer version
+        shell: pwsh
+        run: |
+          $issPath = "installer/WisprClone.iss"
+          $content = Get-Content $issPath -Raw
+          $content = $content -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ steps.version.outputs.VERSION }}"'
+          Set-Content $issPath $content
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/WisprClone.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WisprClone-Windows-Installer
+          path: installer/output/WisprClone-Setup-*.exe
+          retention-days: 1
+
   release:
-    needs: build
+    needs: [build, build-installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -121,6 +179,7 @@ jobs:
           files: |
             ./artifacts/**/*.zip
             ./artifacts/**/*.tar.gz
+            ./artifacts/**/*.exe
           body: |
             ## WisprClone v${{ steps.version.outputs.VERSION }}
 
@@ -130,6 +189,7 @@ jobs:
 
             | Platform | Architecture | Download |
             |----------|--------------|----------|
+            | **Windows Installer** | x64 | `WisprClone-Setup-${{ steps.version.outputs.VERSION }}.exe` |
             | Windows | x64 | `WisprClone-Windows-x64-${{ steps.version.outputs.VERSION }}.zip` |
             | Windows | ARM64 | `WisprClone-Windows-arm64-${{ steps.version.outputs.VERSION }}.zip` |
             | macOS | Intel (x64) | `WisprClone-macOS-x64-${{ steps.version.outputs.VERSION }}.tar.gz` |
@@ -139,6 +199,10 @@ jobs:
 
             ### Installation
 
+            #### Windows (Recommended)
+            Download and run `WisprClone-Setup-${{ steps.version.outputs.VERSION }}.exe` for a full installation with Start Menu shortcuts and uninstaller.
+
+            #### Portable / Other Platforms
             1. Download the appropriate archive for your platform
             2. Extract the archive
             3. Run `WisprClone` (or `WisprClone.exe` on Windows)
