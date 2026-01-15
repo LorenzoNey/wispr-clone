@@ -47,6 +47,8 @@ public partial class App : Application
         // Subscribe to shutdown event to properly dispose resources
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Keep app running even when no windows are visible (for tray icon)
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             desktop.ShutdownRequested += OnShutdownRequested;
         }
 
@@ -375,11 +377,6 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log($"Error in {actionName}: {ex.Message}");
-            // Re-establish tray icon visibility in case it was lost
-            if (_trayIcon != null)
-            {
-                _trayIcon.IsVisible = true;
-            }
         }
     }
 

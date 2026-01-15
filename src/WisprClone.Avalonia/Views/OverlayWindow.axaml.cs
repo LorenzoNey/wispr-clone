@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -53,7 +54,6 @@ public partial class OverlayWindow : Window
 
             // Bind window position changes only
             // Note: Show/Hide is handled by App.axaml.cs via ShowOverlayRequested/HideOverlayRequested events
-            // to avoid double Show() calls that can cause crashes
             vm.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName == nameof(OverlayViewModel.WindowLeft))
