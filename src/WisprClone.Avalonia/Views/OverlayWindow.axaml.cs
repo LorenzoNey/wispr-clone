@@ -29,6 +29,18 @@ public partial class OverlayWindow : Window
             if (_viewModel != null)
                 _viewModel.IsMouseOverWindow = false;
         };
+
+        // Track position changes
+        PositionChanged += OnWindowPositionChanged;
+    }
+
+    private void OnWindowPositionChanged(object? sender, PixelPointEventArgs e)
+    {
+        if (_viewModel != null)
+        {
+            _viewModel.WindowLeft = e.Point.X;
+            _viewModel.WindowTop = e.Point.Y;
+        }
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -57,17 +69,6 @@ public partial class OverlayWindow : Window
 
             // Set initial position
             Position = new PixelPoint((int)vm.WindowLeft, (int)vm.WindowTop);
-        }
-    }
-
-    protected override void OnPositionChanged(PixelPointEventArgs e)
-    {
-        base.OnPositionChanged(e);
-
-        if (_viewModel != null)
-        {
-            _viewModel.WindowLeft = e.Point.X;
-            _viewModel.WindowTop = e.Point.Y;
         }
     }
 
