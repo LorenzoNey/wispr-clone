@@ -3,7 +3,7 @@
 A **cross-platform** speech-to-text application inspired by Wispr Flow. Press **Ctrl+Ctrl** (double-tap) to start/stop speech recognition, and the transcribed text is automatically copied to your clipboard.
 
 [![Release](https://github.com/LorenzoNey/wispr-clone/actions/workflows/release.yml/badge.svg)](https://github.com/LorenzoNey/wispr-clone/actions/workflows/release.yml)
-[![Latest Version](https://img.shields.io/badge/latest-v2.2.8-blue)](https://github.com/LorenzoNey/wispr-clone/releases/latest)
+[![Latest Version](https://img.shields.io/badge/latest-v2.3.0-blue)](https://github.com/LorenzoNey/wispr-clone/releases/latest)
 
 ## Features
 
