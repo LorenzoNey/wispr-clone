@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
@@ -104,52 +103,46 @@ public partial class App : Application
         // Global keyboard hook (cross-platform via SharpHook)
         services.AddSingleton<IGlobalKeyboardHook, SharpHookKeyboardHook>();
 
-        // Platform-specific speech services
-        if (OperatingSystem.IsWindows())
+        // Speech services
+        services.AddSingleton<AzureSpeechRecognitionService>();
+        services.AddSingleton<OpenAIWhisperSpeechRecognitionService>();
+
+#if WINDOWS
+        // Windows: All providers available including offline
+        services.AddSingleton<OfflineSpeechRecognitionService>();
+        services.AddSingleton<HybridSpeechRecognitionService>(sp =>
         {
-            // Windows: All providers available
-            services.AddSingleton<OfflineSpeechRecognitionService>();
-            services.AddSingleton<AzureSpeechRecognitionService>();
-            services.AddSingleton<OpenAIWhisperSpeechRecognitionService>();
-            services.AddSingleton<HybridSpeechRecognitionService>(sp =>
-            {
-                var settings = sp.GetRequiredService<ISettingsService>();
-                var offline = sp.GetRequiredService<OfflineSpeechRecognitionService>();
-                var azure = sp.GetRequiredService<AzureSpeechRecognitionService>();
-                return new HybridSpeechRecognitionService(offline, azure, settings);
-            });
+            var settings = sp.GetRequiredService<ISettingsService>();
+            var offline = sp.GetRequiredService<OfflineSpeechRecognitionService>();
+            var azure = sp.GetRequiredService<AzureSpeechRecognitionService>();
+            return new HybridSpeechRecognitionService(offline, azure, settings);
+        });
 
-            services.AddSingleton<ISpeechRecognitionService>(sp =>
-            {
-                var settings = sp.GetRequiredService<ISettingsService>();
-                Log($"Initial speech provider: {settings.Current.SpeechProvider}");
-
-                return new SpeechServiceManager(
-                    sp.GetRequiredService<OfflineSpeechRecognitionService>(),
-                    sp.GetRequiredService<AzureSpeechRecognitionService>(),
-                    sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
-                    sp.GetRequiredService<HybridSpeechRecognitionService>(),
-                    settings);
-            });
-        }
-        else
+        services.AddSingleton<ISpeechRecognitionService>(sp =>
         {
-            // macOS/Linux: Cloud providers only (Azure + OpenAI)
-            services.AddSingleton<AzureSpeechRecognitionService>();
-            services.AddSingleton<OpenAIWhisperSpeechRecognitionService>();
+            var settings = sp.GetRequiredService<ISettingsService>();
+            Log($"Initial speech provider: {settings.Current.SpeechProvider}");
 
-            services.AddSingleton<ISpeechRecognitionService>(sp =>
-            {
-                var settings = sp.GetRequiredService<ISettingsService>();
-                Log($"Initial speech provider (non-Windows): {settings.Current.SpeechProvider}");
+            return new SpeechServiceManager(
+                sp.GetRequiredService<OfflineSpeechRecognitionService>(),
+                sp.GetRequiredService<AzureSpeechRecognitionService>(),
+                sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
+                sp.GetRequiredService<HybridSpeechRecognitionService>(),
+                settings);
+        });
+#else
+        // macOS/Linux: Cloud providers only (Azure + OpenAI)
+        services.AddSingleton<ISpeechRecognitionService>(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsService>();
+            Log($"Initial speech provider (non-Windows): {settings.Current.SpeechProvider}");
 
-                // Use SpeechServiceManager without offline services
-                return new CrossPlatformSpeechServiceManager(
-                    sp.GetRequiredService<AzureSpeechRecognitionService>(),
-                    sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
-                    settings);
-            });
-        }
+            return new CrossPlatformSpeechServiceManager(
+                sp.GetRequiredService<AzureSpeechRecognitionService>(),
+                sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
+                settings);
+        });
+#endif
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
@@ -208,19 +201,8 @@ public partial class App : Application
 
     private Stream GetIconStream(string iconName)
     {
-        // Try to load from resources
-        var assembly = typeof(App).Assembly;
-        var resourceName = $"WisprClone.Resources.Icons.{iconName}";
-        var stream = assembly.GetManifestResourceStream(resourceName);
-
-        if (stream == null)
-        {
-            // Fallback: try avares
-            var uri = new Uri($"avares://WisprClone/Resources/Icons/{iconName}");
-            return AssetLoader.Open(uri);
-        }
-
-        return stream;
+        var uri = new Uri($"avares://WisprClone/Resources/Icons/{iconName}");
+        return AssetLoader.Open(uri);
     }
 
     private static void Log(string message)
