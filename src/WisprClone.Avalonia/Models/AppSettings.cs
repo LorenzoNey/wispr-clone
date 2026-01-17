@@ -34,6 +34,8 @@ public class AppSettings
 
     // Behavior Settings
     public bool AutoCopyToClipboard { get; set; } = true;
+    public bool AutoPasteAfterCopy { get; set; } = false;
+    public int PasteDelayMs { get; set; } = 100;
     public bool PlaySoundOnStart { get; set; } = false;
     public bool PlaySoundOnStop { get; set; } = false;
     public bool RunOnStartup { get; set; } = false;
