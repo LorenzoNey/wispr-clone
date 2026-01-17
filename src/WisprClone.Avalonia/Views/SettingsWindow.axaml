@@ -12,12 +12,28 @@
         Background="#FF1E1E1E">
 
     <Window.Styles>
-        <!-- Section header style -->
-        <Style Selector="TextBlock.sectionHeader">
-            <Setter Property="Foreground" Value="#FF3391FF"/>
+        <!-- Card container -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#FF252525"/>
+            <Setter Property="BorderBrush" Value="#FF333333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <!-- Card title -->
+        <Style Selector="TextBlock.cardTitle">
+            <Setter Property="Foreground" Value="#FFE0E0E0"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,16,0,12"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <!-- Inline input row -->
+        <Style Selector="StackPanel.inputRow">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
 
         <!-- Label style -->
@@ -25,6 +41,13 @@
             <Setter Property="Foreground" Value="#FFB0B0B0"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <!-- Inline label style (for inline inputs) -->
+        <Style Selector="TextBlock.inlineLabel">
+            <Setter Property="Foreground" Value="#FFB0B0B0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
         <!-- Info text style -->
@@ -114,229 +137,298 @@
         <Style Selector="Button.secondary:pressed">
             <Setter Property="Background" Value="#FF353535"/>
         </Style>
+
+        <!-- TabControl style -->
+        <Style Selector="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#FFB0B0B0"/>
+            <Setter Property="Padding" Value="16,8"/>
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Foreground" Value="#FF3391FF"/>
+        </Style>
     </Window.Styles>
 
-    <Grid Margin="24,24,6,24" RowDefinitions="*,Auto">
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="0,0,18,0">
-                <!-- Speech Provider Selection -->
-                <TextBlock Text="Speech Provider" Classes="sectionHeader" Margin="0,0,0,12"/>
+    <Grid Margin="2,2,2,8" RowDefinitions="*,Auto">
+        <TabControl Grid.Row="0">
+            <!-- General Tab -->
+            <TabItem Header="General">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                    <StackPanel Margin="2,0,2,0">
+                        <!-- Speech Provider Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Speech Provider" Classes="cardTitle"/>
 
-                <TextBlock Text="Select Provider" Classes="label"/>
-                <ComboBox x:Name="SpeechProviderComboBox" Classes="settings">
-                    <ComboBoxItem Content="Offline (Windows Speech)" Tag="Offline" IsSelected="True"/>
-                    <ComboBoxItem Content="Azure Speech Service" Tag="Azure"/>
-                    <ComboBoxItem Content="OpenAI Whisper (Batch)" Tag="OpenAI"/>
-                </ComboBox>
+                                <TextBlock Text="Select Provider" Classes="label"/>
+                                <ComboBox x:Name="SpeechProviderComboBox"
+                                          Classes="settings"
+                                          Width="250"
+                                          HorizontalAlignment="Left"
+                                          SelectionChanged="SpeechProviderComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Offline (Windows Speech)" Tag="Offline" IsSelected="True"/>
+                                    <ComboBoxItem Content="Azure Speech Service" Tag="Azure"/>
+                                    <ComboBoxItem Content="OpenAI Whisper (Batch)" Tag="OpenAI"/>
+                                </ComboBox>
 
-                <TextBlock x:Name="ProviderInfoText"
-                           Text="Note: Changing the speech provider requires an app restart to take effect."
-                           Classes="info"/>
+                                <TextBlock x:Name="ProviderInfoText"
+                                           Text="Note: Changing the speech provider requires an app restart to take effect."
+                                           Classes="info"/>
 
-                <!-- Azure Settings -->
-                <TextBlock Text="Azure Speech Service" Classes="sectionHeader"/>
+                                <!-- Azure Settings Panel (conditional) -->
+                                <StackPanel x:Name="AzureSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
 
-                <TextBlock Text="Subscription Key" Classes="label"/>
-                <TextBox x:Name="AzureKeyTextBox" Classes="settings" PasswordChar="*"/>
+                                    <TextBlock Text="Subscription Key" Classes="label"/>
+                                    <TextBox x:Name="AzureKeyTextBox" Classes="settings" Width="300" HorizontalAlignment="Left" PasswordChar="*"/>
 
-                <TextBlock Text="Region" Classes="label" Margin="0,12,0,6"/>
-                <TextBox x:Name="AzureRegionTextBox" Classes="settings"/>
+                                    <TextBlock Text="Region" Classes="label" Margin="0,12,0,6"/>
+                                    <TextBox x:Name="AzureRegionTextBox" Classes="settings" Width="120" HorizontalAlignment="Left"/>
 
-                <CheckBox x:Name="UseAzureFallbackCheckBox"
-                          Content="Use Azure as fallback when offline recognition fails"
-                          Classes="settings"
-                          Margin="0,12,0,0"/>
+                                    <CheckBox x:Name="UseAzureFallbackCheckBox"
+                                              Content="Use Azure as fallback when offline recognition fails"
+                                              Classes="settings"
+                                              Margin="0,12,0,0"/>
+                                </StackPanel>
 
-                <!-- OpenAI Settings -->
-                <TextBlock Text="OpenAI (Whisper &amp; Realtime)" Classes="sectionHeader"/>
+                                <!-- OpenAI Settings Panel (conditional) -->
+                                <StackPanel x:Name="OpenAISettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
 
-                <TextBlock Text="API Key" Classes="label"/>
-                <TextBox x:Name="OpenAIKeyTextBox" Classes="settings" PasswordChar="*"/>
+                                    <TextBlock Text="API Key" Classes="label"/>
+                                    <TextBox x:Name="OpenAIKeyTextBox" Classes="settings" Width="300" HorizontalAlignment="Left" PasswordChar="*"/>
 
-                <TextBlock Text="Used for both Whisper (batch) and Realtime (streaming) providers."
-                           Classes="info"/>
-                <TextBlock Text="Whisper: Re-transcribes entire audio every 2s. Realtime: True streaming via WebSocket."
-                           Classes="info" Margin="0,4,0,0"/>
-                <TextBlock Text="⚠ Realtime API costs ~10x more than Whisper ($0.06/min vs $0.006/min)."
-                           Classes="info" Margin="0,4,0,0" Foreground="#FFFFA500"/>
+                                    <TextBlock Text="Used for Whisper batch API. Re-transcribes entire audio every 2s."
+                                               Classes="info"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                <!-- Language Settings -->
-                <TextBlock Text="Language" Classes="sectionHeader"/>
+                        <!-- Language Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Language" Classes="cardTitle"/>
 
-                <TextBlock Text="Recognition Language" Classes="label"/>
-                <ComboBox x:Name="LanguageComboBox" Classes="settings">
-                    <ComboBoxItem Content="English (US)" Tag="en-US" IsSelected="True"/>
-                    <ComboBoxItem Content="English (UK)" Tag="en-GB"/>
-                    <ComboBoxItem Content="Romanian" Tag="ro-RO"/>
-                    <ComboBoxItem Content="Spanish" Tag="es-ES"/>
-                    <ComboBoxItem Content="French" Tag="fr-FR"/>
-                    <ComboBoxItem Content="German" Tag="de-DE"/>
-                    <ComboBoxItem Content="Italian" Tag="it-IT"/>
-                    <ComboBoxItem Content="Portuguese" Tag="pt-BR"/>
-                    <ComboBoxItem Content="Chinese (Simplified)" Tag="zh-CN"/>
-                    <ComboBoxItem Content="Japanese" Tag="ja-JP"/>
-                </ComboBox>
+                                <TextBlock Text="Recognition Language" Classes="label"/>
+                                <ComboBox x:Name="LanguageComboBox" Classes="settings" Width="250" HorizontalAlignment="Left">
+                                    <ComboBoxItem Content="English (US)" Tag="en-US" IsSelected="True"/>
+                                    <ComboBoxItem Content="English (UK)" Tag="en-GB"/>
+                                    <ComboBoxItem Content="Romanian" Tag="ro-RO"/>
+                                    <ComboBoxItem Content="Spanish" Tag="es-ES"/>
+                                    <ComboBoxItem Content="French" Tag="fr-FR"/>
+                                    <ComboBoxItem Content="German" Tag="de-DE"/>
+                                    <ComboBoxItem Content="Italian" Tag="it-IT"/>
+                                    <ComboBoxItem Content="Portuguese" Tag="pt-BR"/>
+                                    <ComboBoxItem Content="Chinese (Simplified)" Tag="zh-CN"/>
+                                    <ComboBoxItem Content="Japanese" Tag="ja-JP"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
 
-                <!-- Hotkey Settings -->
-                <TextBlock Text="Hotkey" Classes="sectionHeader"/>
+                        <!-- Behavior Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Behavior" Classes="cardTitle"/>
 
-                <Grid ColumnDefinitions="*,16,*">
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Double-tap interval (ms)" Classes="label"/>
-                        <TextBox x:Name="DoubleTapIntervalTextBox" Classes="settings"/>
+                                <CheckBox x:Name="AutoCopyCheckBox"
+                                          Content="Automatically copy transcription to clipboard"
+                                          Classes="settings"
+                                          Margin="0"/>
+
+                                <CheckBox x:Name="AutoPasteCheckBox"
+                                          Content="Automatically paste after copying"
+                                          Classes="settings"
+                                          IsEnabled="{Binding #AutoCopyCheckBox.IsChecked}"
+                                          Margin="24,6,0,0"/>
+
+                                <CheckBox x:Name="StartMinimizedCheckBox"
+                                          Content="Start with overlay hidden"
+                                          Classes="settings"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Max key hold (ms)" Classes="label"/>
-                        <TextBox x:Name="MaxKeyHoldTextBox" Classes="settings"/>
+            <!-- Advanced Tab -->
+            <TabItem Header="Advanced">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                    <StackPanel Margin="2,0,2,0">
+                        <!-- Hotkey Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Hotkey Configuration" Classes="cardTitle"/>
+
+                                <StackPanel Classes="inputRow">
+                                    <TextBlock Text="Double-tap interval" Classes="inlineLabel" Width="140"/>
+                                    <TextBox x:Name="DoubleTapIntervalTextBox" Classes="settings" Width="100"/>
+                                    <TextBlock Text="ms" Classes="inlineLabel" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Classes="inputRow">
+                                    <TextBlock Text="Max key hold" Classes="inlineLabel" Width="140"/>
+                                    <TextBox x:Name="MaxKeyHoldTextBox" Classes="settings" Width="100"/>
+                                    <TextBlock Text="ms" Classes="inlineLabel" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Double-tap Ctrl to start/stop dictation."
+                                           Classes="info" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Recording Limits Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Recording Limits" Classes="cardTitle"/>
+
+                                <StackPanel Classes="inputRow" Margin="0">
+                                    <TextBlock Text="Max recording duration" Classes="inlineLabel" Width="140"/>
+                                    <TextBox x:Name="MaxRecordingDurationTextBox" Classes="settings" Width="100"/>
+                                    <TextBlock Text="seconds" Classes="inlineLabel" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Recording will automatically stop after this duration (10-600 seconds)."
+                                           Classes="info"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Debugging Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Debugging" Classes="cardTitle"/>
+
+                                <CheckBox x:Name="EnableLoggingCheckBox"
+                                          Content="Enable logging"
+                                          Classes="settings"
+                                          Margin="0"/>
+                                <TextBlock Text="Logs are saved to %AppData%/WisprClone"
+                                           Classes="info"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </Grid>
+                </ScrollViewer>
+            </TabItem>
 
-                <!-- Recording Limits -->
-                <TextBlock Text="Recording Limits" Classes="sectionHeader"/>
+            <!-- About Tab -->
+            <TabItem Header="About">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                    <StackPanel Margin="2,0,2,0">
+                        <!-- App Info Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="WisprClone" Classes="cardTitle" Margin="0,0,0,4"/>
 
-                <TextBlock Text="Maximum recording duration (seconds)" Classes="label"/>
-                <TextBox x:Name="MaxRecordingDurationTextBox" Classes="settings" Width="120" HorizontalAlignment="Left"/>
-                <TextBlock Text="Recording will automatically stop after this duration (10-600 seconds)."
-                           Classes="info"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Version:"
+                                               Foreground="#FFB0B0B0"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="VersionText"
+                                               Text="v2.0.0"
+                                               Foreground="#FFE0E0E0"
+                                               FontSize="12"
+                                               FontWeight="Medium"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
 
-                <!-- Behavior Settings -->
-                <TextBlock Text="Behavior" Classes="sectionHeader"/>
+                                <TextBlock Text="A cross-platform voice-to-text transcription tool."
+                                           Foreground="#FF808080"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
 
-                <CheckBox x:Name="AutoCopyCheckBox"
-                          Content="Automatically copy transcription to clipboard"
-                          Classes="settings"
-                          Margin="0"/>
+                        <!-- Updates Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Updates" Classes="cardTitle"/>
 
-                <CheckBox x:Name="StartMinimizedCheckBox"
-                          Content="Start minimized to system tray"
-                          Classes="settings"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Current Version:"
+                                               Foreground="#FFB0B0B0"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="CurrentVersionText"
+                                               Text="v2.0.0"
+                                               Foreground="#FFE0E0E0"
+                                               FontSize="12"
+                                               FontWeight="Medium"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
 
-                <CheckBox x:Name="MinimizeToTrayCheckBox"
-                          Content="Minimize to system tray instead of taskbar"
-                          Classes="settings"/>
+                                <StackPanel x:Name="UpdateAvailablePanel" IsVisible="False" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="New Version Available:"
+                                                   Foreground="#FF4CAF50"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"/>
+                                        <TextBlock x:Name="NewVersionText"
+                                                   Text="v2.1.0"
+                                                   Foreground="#FF4CAF50"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
 
-                <!-- Debugging -->
-                <TextBlock Text="Debugging" Classes="sectionHeader"/>
+                                    <Button x:Name="DownloadUpdateButton"
+                                            Content="Download Update"
+                                            Classes="primary"
+                                            Click="DownloadUpdateButton_Click"
+                                            HorizontalAlignment="Left"
+                                            Margin="0,4,0,0"/>
 
-                <CheckBox x:Name="EnableLoggingCheckBox"
-                          Content="Enable logging"
-                          Classes="settings"
-                          Margin="0"/>
-                <TextBlock Text="Logs are saved to app data folder"
-                           Classes="info"
-                           Margin="0,4,0,0"/>
+                                    <ProgressBar x:Name="DownloadProgressBar"
+                                                 IsVisible="False"
+                                                 Value="0"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Height="4"
+                                                 Margin="0,8,0,0"
+                                                 Background="#FF404040"
+                                                 Foreground="#FF4CAF50"/>
 
-                <!-- Updates -->
-                <TextBlock Text="Updates" Classes="sectionHeader"/>
+                                    <TextBlock x:Name="DownloadStatusText"
+                                               Text=""
+                                               Classes="info"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="Current Version:"
-                               Foreground="#FFB0B0B0"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"/>
-                    <TextBlock x:Name="CurrentVersionText"
-                               Text="v2.0.0"
-                               Foreground="#FFE0E0E0"
-                               FontSize="12"
-                               FontWeight="Medium"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+                                <StackPanel x:Name="NoUpdatePanel" IsVisible="True" Margin="0,0,0,8">
+                                    <TextBlock Text="You have the latest version."
+                                               Foreground="#FF808080"
+                                               FontSize="11"/>
+                                </StackPanel>
 
-                <StackPanel x:Name="UpdateAvailablePanel" IsVisible="False" Margin="0,0,0,12">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="New Version Available:"
-                                   Foreground="#FF4CAF50"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,8,0"/>
-                        <TextBlock x:Name="NewVersionText"
-                                   Text="v2.1.0"
-                                   Foreground="#FF4CAF50"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
+                                <CheckBox x:Name="AutoCheckUpdatesCheckBox"
+                                          Content="Check for updates automatically"
+                                          Classes="settings"
+                                          Margin="0,4,0,0"/>
+
+                                <Button x:Name="CheckForUpdatesButton"
+                                        Content="Check Now"
+                                        Classes="secondary"
+                                        Click="CheckForUpdatesButton_Click"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-
-                    <Button x:Name="DownloadUpdateButton"
-                            Content="Download Update"
-                            Classes="primary"
-                            Click="DownloadUpdateButton_Click"
-                            HorizontalAlignment="Left"
-                            Margin="0,4,0,0"/>
-
-                    <ProgressBar x:Name="DownloadProgressBar"
-                                 IsVisible="False"
-                                 Value="0"
-                                 Minimum="0"
-                                 Maximum="100"
-                                 Height="4"
-                                 Margin="0,8,0,0"
-                                 Background="#FF404040"
-                                 Foreground="#FF4CAF50"/>
-
-                    <TextBlock x:Name="DownloadStatusText"
-                               Text=""
-                               Classes="info"
-                               Margin="0,4,0,0"/>
-                </StackPanel>
-
-                <StackPanel x:Name="NoUpdatePanel" IsVisible="True" Margin="0,0,0,8">
-                    <TextBlock Text="You have the latest version."
-                               Foreground="#FF808080"
-                               FontSize="11"/>
-                </StackPanel>
-
-                <CheckBox x:Name="AutoCheckUpdatesCheckBox"
-                          Content="Check for updates automatically"
-                          Classes="settings"
-                          Margin="0,4,0,0"/>
-
-                <Button x:Name="CheckForUpdatesButton"
-                        Content="Check Now"
-                        Classes="secondary"
-                        Click="CheckForUpdatesButton_Click"
-                        HorizontalAlignment="Left"
-                        Margin="0,12,0,0"/>
-
-                <!-- About -->
-                <TextBlock Text="About" Classes="sectionHeader"/>
-
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="WisprClone"
-                               Foreground="#FFE0E0E0"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"/>
-                    <TextBlock x:Name="VersionText"
-                               Text="v2.0.0"
-                               Foreground="#FF808080"
-                               FontSize="12"
-                               Margin="8,0,0,0"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <TextBlock Text="A cross-platform voice-to-text transcription tool."
-                           Foreground="#FF808080"
-                           FontSize="11"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,8"/>
-
-                <TextBlock Text="Double-tap Ctrl to start/stop dictation."
-                           Foreground="#FF808080"
-                           FontSize="11"
-                           TextWrapping="Wrap"/>
-
-                <Border Height="16"/>
-            </StackPanel>
-        </ScrollViewer>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
 
         <!-- Buttons -->
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
-                    Margin="0,20,0,0">
+                    Margin="0,8,4,0">
             <Button Content="Cancel"
                     Classes="secondary"
                     Click="CancelButton_Click"

@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         _updateService = updateService;
         LoadSettings();
         LoadUpdateStatus();
+        UpdateApiSettingsPanelVisibility();
     }
 
     private void LoadSettings()
@@ -63,8 +64,8 @@ public partial class SettingsWindow : Window
 
         // Behavior
         AutoCopyCheckBox.IsChecked = settings.AutoCopyToClipboard;
+        AutoPasteCheckBox.IsChecked = settings.AutoPasteAfterCopy;
         StartMinimizedCheckBox.IsChecked = settings.StartMinimized;
-        MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
 
         // Debugging
         EnableLoggingCheckBox.IsChecked = settings.EnableLogging;
@@ -128,6 +129,18 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void SpeechProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        UpdateApiSettingsPanelVisibility();
+    }
+
+    private void UpdateApiSettingsPanelVisibility()
+    {
+        var selectedTag = GetSelectedComboBoxTag(SpeechProviderComboBox);
+        AzureSettingsPanel.IsVisible = selectedTag == "Azure";
+        OpenAISettingsPanel.IsVisible = selectedTag == "OpenAI";
+    }
+
     private static void SelectComboBoxItemByTag(ComboBox comboBox, string tag)
     {
         foreach (var item in comboBox.Items.Cast<ComboBoxItem>())
@@ -188,8 +201,8 @@ public partial class SettingsWindow : Window
 
             // Behavior
             settings.AutoCopyToClipboard = AutoCopyCheckBox.IsChecked ?? true;
+            settings.AutoPasteAfterCopy = AutoPasteCheckBox.IsChecked ?? false;
             settings.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
-            settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
 
             // Debugging
             settings.EnableLogging = EnableLoggingCheckBox.IsChecked ?? false;
