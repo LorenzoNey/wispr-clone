@@ -16,6 +16,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly IClipboardService _clipboardService;
     private readonly ISettingsService _settingsService;
     private readonly IGlobalKeyboardHook _keyboardHook;
+    private readonly IKeyboardSimulationService _keyboardSimulator;
     private readonly DoubleKeyTapDetector _hotkeyDetector;
 
     private OverlayViewModel? _overlayViewModel;
@@ -59,12 +60,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ISpeechRecognitionService speechService,
         IClipboardService clipboardService,
         ISettingsService settingsService,
-        IGlobalKeyboardHook keyboardHook)
+        IGlobalKeyboardHook keyboardHook,
+        IKeyboardSimulationService keyboardSimulator)
     {
         _speechService = speechService;
         _clipboardService = clipboardService;
         _settingsService = settingsService;
         _keyboardHook = keyboardHook;
+        _keyboardSimulator = keyboardSimulator;
 
         var settings = settingsService.Current;
         _hotkeyDetector = new DoubleKeyTapDetector(
@@ -191,7 +194,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             if (_settingsService.Current.AutoCopyToClipboard && !string.IsNullOrWhiteSpace(finalText))
             {
-                _ = _clipboardService.SetTextAsync(finalText);
+                await _clipboardService.SetTextAsync(finalText);
+
+                // Auto-paste if enabled
+                if (_settingsService.Current.AutoPasteAfterCopy)
+                {
+                    await _keyboardSimulator.SimulatePasteAsync();
+                }
             }
 
             SetState(TranscriptionState.Idle);
@@ -227,7 +236,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             if (_settingsService.Current.AutoCopyToClipboard && !string.IsNullOrWhiteSpace(finalText))
             {
-                _ = _clipboardService.SetTextAsync(finalText);
+                await _clipboardService.SetTextAsync(finalText);
+
+                // Auto-paste if enabled
+                if (_settingsService.Current.AutoPasteAfterCopy)
+                {
+                    await _keyboardSimulator.SimulatePasteAsync();
+                }
             }
 
             SetState(TranscriptionState.Idle);
@@ -392,6 +407,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         _hotkeyDetector.Dispose();
         _keyboardHook.Dispose();
+        _keyboardSimulator.Dispose();
         _speechService.Dispose();
         _maxDurationRegistration?.Dispose();
         _recognitionCts?.Dispose();

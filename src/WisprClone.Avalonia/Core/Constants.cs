@@ -64,4 +64,19 @@ public static class Constants
     /// Default update check interval in hours.
     /// </summary>
     public const int DefaultUpdateCheckIntervalHours = 6;
+
+    /// <summary>
+    /// Default delay before simulating paste (milliseconds).
+    /// </summary>
+    public const int DefaultPasteDelayMs = 100;
+
+    /// <summary>
+    /// Minimum delay before simulating paste (milliseconds).
+    /// </summary>
+    public const int MinPasteDelayMs = 50;
+
+    /// <summary>
+    /// Maximum delay before simulating paste (milliseconds).
+    /// </summary>
+    public const int MaxPasteDelayMs = 500;
 }

@@ -251,6 +251,9 @@ public partial class App : Application
         // Global keyboard hook (cross-platform via SharpHook)
         services.AddSingleton<IGlobalKeyboardHook, SharpHookKeyboardHook>();
 
+        // Keyboard simulation service (cross-platform via SharpHook)
+        services.AddSingleton<IKeyboardSimulationService, SharpHookKeyboardSimulationService>();
+
         // Update service
         services.AddSingleton<IUpdateService, UpdateService>();
 
