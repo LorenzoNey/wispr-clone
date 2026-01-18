@@ -12,6 +12,7 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
+        ShowActivated="False"
         CanResize="False"
         Width="420" MinHeight="100" Height="100"
         SizeToContent="Height">

@@ -191,7 +191,7 @@ public class OpenAIWhisperSpeechRecognitionService : ISpeechRecognitionService
             if (!string.IsNullOrWhiteSpace(fullText) && fullText != _lastTranscription)
             {
                 _lastTranscription = fullText;
-                Log($"Full transcription: '{fullText}'");
+                Log($"Full transcription received (length: {fullText.Length})");
                 // Whisper re-transcribes entire audio, so each update is finalized
                 RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(fullText, false, true));
             }
@@ -243,7 +243,7 @@ public class OpenAIWhisperSpeechRecognitionService : ISpeechRecognitionService
                 }
             }
 
-            Log($"Final result: '{finalText}'");
+            Log($"Final result received (length: {finalText.Length})");
 
             RecognitionCompleted?.Invoke(this, new TranscriptionEventArgs(finalText, true));
             UpdateState(RecognitionState.Idle);
@@ -353,8 +353,8 @@ public class OpenAIWhisperSpeechRecognitionService : ISpeechRecognitionService
 
     private static void Log(string message)
     {
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [Whisper] {message}";
+        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [Whisper] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 

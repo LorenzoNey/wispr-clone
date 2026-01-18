@@ -172,8 +172,8 @@ public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
 
     private static void Log(string message)
     {
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [CrossPlatformManager] {message}";
+        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [CrossPlatformManager] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 }

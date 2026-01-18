@@ -43,10 +43,12 @@ public class UpdateService : IUpdateService
 
     public async Task<bool> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
     {
+        Log($"CheckForUpdatesAsync called. Current version: {CurrentVersion}");
         await _checkLock.WaitAsync(cancellationToken);
         try
         {
             var apiUrl = $"https://api.github.com/repos/{Constants.GitHubOwner}/{Constants.GitHubRepo}/releases/latest";
+            Log($"Fetching: {apiUrl}");
             var response = await _httpClient.GetAsync(apiUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
@@ -61,6 +63,7 @@ public class UpdateService : IUpdateService
 
             // Parse version from tag (e.g., "v2.1.0" -> "2.1.0")
             var versionString = _latestRelease.TagName.TrimStart('v', 'V');
+            Log($"Latest release tag: {_latestRelease.TagName}, parsed version: {versionString}");
             if (Version.TryParse(versionString, out var latestVersion))
             {
                 LatestVersion = latestVersion;
@@ -71,9 +74,11 @@ public class UpdateService : IUpdateService
 
                 IsUpdateAvailable = latestComparable > currentComparable;
                 DownloadUrl = GetPlatformSpecificAssetUrl();
+                Log($"Version comparison: current={currentComparable}, latest={latestComparable}, updateAvailable={IsUpdateAvailable}");
 
                 if (IsUpdateAvailable)
                 {
+                    Log("Raising UpdateAvailable event");
                     UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs
                     {
                         LatestVersion = latestVersion,
@@ -86,11 +91,12 @@ public class UpdateService : IUpdateService
                 return IsUpdateAvailable;
             }
 
+            Log($"Failed to parse version: {versionString}");
             return false;
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail - update checking should not break the app
+            Log($"CheckForUpdatesAsync error: {ex.Message}");
             return false;
         }
         finally
@@ -113,15 +119,32 @@ public class UpdateService : IUpdateService
     {
         try
         {
+            Log("Periodic update checker started");
             while (await _periodicTimer!.WaitForNextTickAsync(cancellationToken))
             {
-                await CheckForUpdatesAsync(cancellationToken);
+                Log("Periodic update check triggered");
+                var hasUpdate = await CheckForUpdatesAsync(cancellationToken);
+                Log($"Periodic update check completed. Update available: {hasUpdate}");
             }
         }
         catch (OperationCanceledException)
         {
             // Expected when stopping
+            Log("Periodic update checker stopped");
         }
+        catch (Exception ex)
+        {
+            Log($"Periodic update checker error: {ex.Message}");
+        }
+    }
+
+    private static void Log(string message)
+    {
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [UpdateService] {message}";
+        try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 
     public void StopPeriodicChecks()

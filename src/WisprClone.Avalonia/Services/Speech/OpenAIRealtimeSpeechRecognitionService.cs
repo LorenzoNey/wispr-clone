@@ -49,8 +49,8 @@ public class OpenAIRealtimeSpeechRecognitionService : ISpeechRecognitionService
 
     private static void Log(string message)
     {
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [OpenAI-RT] {message}";
+        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [OpenAI-RT] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 
@@ -156,7 +156,7 @@ public class OpenAIRealtimeSpeechRecognitionService : ISpeechRecognitionService
         }
 
         var finalText = _transcriptionBuffer.ToString().Trim();
-        Log($"Final transcription: '{finalText}'");
+        Log($"Final transcription received (length: {finalText.Length})");
 
         RecognitionCompleted?.Invoke(this, new TranscriptionEventArgs(finalText, true, true));
         UpdateState(RecognitionState.Idle);
@@ -373,7 +373,7 @@ public class OpenAIRealtimeSpeechRecognitionService : ISpeechRecognitionService
                         {
                             _transcriptionBuffer.Append(transcript + " ");
                             var fullText = _transcriptionBuffer.ToString().Trim();
-                            Log($"Transcription: '{transcript}' -> Full: '{fullText}'");
+                            Log($"Transcription received (segment: {transcript.Length} chars, total: {fullText.Length} chars)");
                             RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(fullText, false, true));
                         }
                     }

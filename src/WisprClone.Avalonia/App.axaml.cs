@@ -97,12 +97,15 @@ public partial class App : Application
         _updateService.UpdateAvailable += OnUpdateAvailable;
 
         var settings = _serviceProvider.GetRequiredService<ISettingsService>();
+        Log($"CheckForUpdatesAutomatically: {settings.Current.CheckForUpdatesAutomatically}");
         if (settings.Current.CheckForUpdatesAutomatically)
         {
             // Check for updates on startup (fire and forget)
+            Log("Starting initial update check...");
             _ = _updateService.CheckForUpdatesAsync();
 
             // Start periodic checks
+            Log($"Starting periodic checks every {Constants.DefaultUpdateCheckIntervalHours} hours");
             _updateService.StartPeriodicChecks(TimeSpan.FromHours(Constants.DefaultUpdateCheckIntervalHours));
         }
     }
@@ -504,9 +507,9 @@ public partial class App : Application
     private static void Log(string message)
     {
         var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-            "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [App] {message}";
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [App] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 }

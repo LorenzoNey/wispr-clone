@@ -29,33 +29,21 @@ public class SharpHookKeyboardSimulationService : IKeyboardSimulationService
         {
             Log("SimulatePasteAsync called");
 
-            // Wait longer to ensure user has fully released the hotkey (Ctrl)
-            // and clipboard is ready
+            // Wait to ensure user has fully released the hotkey and clipboard is ready
             await Task.Delay(250);
 
-            // Determine modifier key based on platform
-            // macOS uses Cmd (Meta), Windows/Linux use Ctrl
-            var modifierKey = OperatingSystem.IsMacOS()
-                ? KeyCode.VcLeftMeta
-                : KeyCode.VcLeftControl;
-
-            Log($"Simulating paste with modifier: {modifierKey}");
-
-            // Simulate paste: Modifier down, V down, V up, Modifier up
-            var result = _simulator.SimulateKeyPress(modifierKey);
-            Log($"Ctrl press result: {result}");
-            await Task.Delay(20); // Small delay between key events
-
-            result = _simulator.SimulateKeyPress(KeyCode.VcV);
-            Log($"V press result: {result}");
-            await Task.Delay(20);
-
-            result = _simulator.SimulateKeyRelease(KeyCode.VcV);
-            Log($"V release result: {result}");
-            await Task.Delay(20);
-
-            result = _simulator.SimulateKeyRelease(modifierKey);
-            Log($"Ctrl release result: {result}");
+            if (OperatingSystem.IsMacOS())
+            {
+                // macOS: Use Cmd+V
+                Log("Simulating paste with Cmd+V (macOS)");
+                await SimulateKeyComboAsync(KeyCode.VcLeftMeta, KeyCode.VcV);
+            }
+            else
+            {
+                // Windows/Linux: Use Shift+Insert (more universal, works in terminals)
+                Log("Simulating paste with Shift+Insert (Windows/Linux)");
+                await SimulateKeyComboAsync(KeyCode.VcLeftShift, KeyCode.VcInsert);
+            }
 
             Log("SimulatePasteAsync completed");
             return true;
@@ -67,12 +55,30 @@ public class SharpHookKeyboardSimulationService : IKeyboardSimulationService
         }
     }
 
+    private async Task SimulateKeyComboAsync(KeyCode modifier, KeyCode key)
+    {
+        var result = _simulator.SimulateKeyPress(modifier);
+        Log($"Modifier press result: {result}");
+        await Task.Delay(20);
+
+        result = _simulator.SimulateKeyPress(key);
+        Log($"Key press result: {result}");
+        await Task.Delay(20);
+
+        result = _simulator.SimulateKeyRelease(key);
+        Log($"Key release result: {result}");
+        await Task.Delay(20);
+
+        result = _simulator.SimulateKeyRelease(modifier);
+        Log($"Modifier release result: {result}");
+    }
+
     private static void Log(string message)
     {
         var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-            "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [KeyboardSim] {message}";
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [KeyboardSim] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 

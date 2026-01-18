@@ -33,8 +33,8 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
 
     private static void Log(string message)
     {
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "wispr_log.txt");
-        var line = $"[{DateTime.Now:HH:mm:ss.fff}] [Azure] {message}";
+        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WisprClone", "wispr_log.txt");
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [Azure] {message}";
         try { File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
     }
 
@@ -129,7 +129,7 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
         Log("StopContinuousRecognitionAsync completed");
 
         var finalText = _transcriptionBuffer.ToString().Trim();
-        Log($"Final text: '{finalText}' (length: {finalText.Length})");
+        Log($"Final text received (length: {finalText.Length})");
 
         RecognitionCompleted?.Invoke(this, new TranscriptionEventArgs(finalText, true));
         UpdateState(RecognitionState.Idle);
@@ -139,7 +139,7 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
 
     private void OnRecognizing(object? sender, SpeechRecognitionEventArgs e)
     {
-        Log($"OnRecognizing: Reason={e.Result.Reason}, Text='{e.Result.Text}'");
+        Log($"OnRecognizing: Reason={e.Result.Reason}, TextLength={e.Result.Text?.Length ?? 0}");
 
         if (e.Result.Reason == ResultReason.RecognizingSpeech)
         {
@@ -151,7 +151,7 @@ public class AzureSpeechRecognitionService : ISpeechRecognitionService
 
     private void OnRecognized(object? sender, SpeechRecognitionEventArgs e)
     {
-        Log($"OnRecognized: Reason={e.Result.Reason}, Text='{e.Result.Text}'");
+        Log($"OnRecognized: Reason={e.Result.Reason}, TextLength={e.Result.Text?.Length ?? 0}");
 
         if (e.Result.Reason == ResultReason.RecognizedSpeech)
         {
