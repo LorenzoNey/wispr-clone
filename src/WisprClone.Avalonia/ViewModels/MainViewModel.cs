@@ -192,14 +192,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             var finalText = await _speechService.StopRecognitionAsync();
 
-            if (_settingsService.Current.AutoCopyToClipboard && !string.IsNullOrWhiteSpace(finalText))
+            if (!string.IsNullOrWhiteSpace(finalText))
             {
-                await _clipboardService.SetTextAsync(finalText);
-
-                // Auto-paste if enabled
+                // Insert at cursor: copy to clipboard and paste (works independently)
                 if (_settingsService.Current.AutoPasteAfterCopy)
                 {
+                    await _clipboardService.SetTextAsync(finalText);
                     await _keyboardSimulator.SimulatePasteAsync();
+                }
+                // Just copy to clipboard (no paste)
+                else if (_settingsService.Current.AutoCopyToClipboard)
+                {
+                    await _clipboardService.SetTextAsync(finalText);
                 }
             }
 
@@ -234,14 +238,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             var finalText = await _speechService.StopRecognitionAsync();
 
-            if (_settingsService.Current.AutoCopyToClipboard && !string.IsNullOrWhiteSpace(finalText))
+            if (!string.IsNullOrWhiteSpace(finalText))
             {
-                await _clipboardService.SetTextAsync(finalText);
-
-                // Auto-paste if enabled
+                // Insert at cursor: copy to clipboard and paste (works independently)
                 if (_settingsService.Current.AutoPasteAfterCopy)
                 {
+                    await _clipboardService.SetTextAsync(finalText);
                     await _keyboardSimulator.SimulatePasteAsync();
+                }
+                // Just copy to clipboard (no paste)
+                else if (_settingsService.Current.AutoCopyToClipboard)
+                {
+                    await _clipboardService.SetTextAsync(finalText);
                 }
             }
 

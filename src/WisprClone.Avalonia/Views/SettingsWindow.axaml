@@ -234,15 +234,13 @@
                                 <TextBlock Text="Behavior" Classes="cardTitle"/>
 
                                 <CheckBox x:Name="AutoCopyCheckBox"
-                                          Content="Automatically copy transcription to clipboard"
+                                          Content="Copy transcription to clipboard"
                                           Classes="settings"
                                           Margin="0"/>
 
                                 <CheckBox x:Name="AutoPasteCheckBox"
-                                          Content="Automatically paste after copying"
-                                          Classes="settings"
-                                          IsEnabled="{Binding #AutoCopyCheckBox.IsChecked}"
-                                          Margin="24,6,0,0"/>
+                                          Content="Insert transcription at cursor"
+                                          Classes="settings"/>
 
                                 <CheckBox x:Name="StartMinimizedCheckBox"
                                           Content="Start with overlay hidden"
