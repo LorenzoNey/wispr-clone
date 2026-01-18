@@ -3,19 +3,22 @@
 A **cross-platform** speech-to-text application inspired by Wispr Flow. Press **Ctrl+Ctrl** (double-tap) to start/stop speech recognition, and the transcribed text is automatically copied to your clipboard.
 
 [![Release](https://github.com/LorenzoNey/wispr-clone/actions/workflows/release.yml/badge.svg)](https://github.com/LorenzoNey/wispr-clone/actions/workflows/release.yml)
-[![Latest Version](https://img.shields.io/badge/latest-v2.3.0-blue)](https://github.com/LorenzoNey/wispr-clone/releases/latest)
+[![Latest Version](https://img.shields.io/github/v/release/LorenzoNey/wispr-clone)](https://github.com/LorenzoNey/wispr-clone/releases/latest)
 
 ## Features
 
 - **Cross-Platform**: Runs on Windows, macOS, and Linux
 - **Multiple Speech Providers**: Choose from Windows offline recognition (Windows only), Azure Speech Service, or OpenAI Whisper
-- **Floating Overlay**: Semi-transparent overlay window showing real-time transcription
+- **Floating Overlay**: Semi-transparent overlay window showing real-time transcription with auto-scroll
 - **Global Hotkey**: Double-tap Ctrl key to toggle speech recognition from anywhere
 - **System Tray**: Runs in the background with dynamic tray icon showing current state
 - **Auto-Clipboard**: Automatically copies transcribed text to clipboard when done
+- **Insert at Cursor**: Optionally paste transcription directly into the active application
+- **Elapsed Time Display**: Shows recording duration in the overlay while transcribing
 - **Recording Safety**: Configurable maximum recording duration to prevent forgotten recordings
-- **Optional Logging**: Debug logging to help troubleshoot issues
-- **Customizable Settings**: Configure language, hotkey timing, API credentials, and more
+- **Update Notifications**: Red dot indicator on tray icon when updates are available
+- **Optional Logging**: Debug logging to help troubleshoot issues (toggleable without restart)
+- **Tabbed Settings**: Clean, organized settings interface with General, Advanced, and About tabs
 
 ## Downloads
 
@@ -73,39 +76,52 @@ A **cross-platform** speech-to-text application inspired by Wispr Flow. Press **
 | Offline (System.Speech) | Yes | No | No | Yes |
 | Azure Speech Service | Yes | Yes | Yes | Yes |
 | OpenAI Whisper (Batch) | Yes | Yes | Yes | No* |
-| OpenAI Realtime | Yes | No** | No** | Yes |
 | Hybrid (Offline + Azure) | Yes | No | No | Yes |
 
 \* Whisper re-transcribes entire audio every 2 seconds (pseudo-streaming)
-\** OpenAI Realtime requires NAudio for audio capture (Windows only currently)
+
+### Cost Comparison
+
+| Provider | Cost | Notes |
+|----------|------|-------|
+| **Offline (Windows)** | Free | Uses built-in Windows speech recognition |
+| **Azure Speech Service** | ~$0.017/min | Pay-as-you-go, first 5 hours/month free |
+| **OpenAI Whisper** | ~$0.006/min | Most cost-effective cloud option |
+| **OpenAI Realtime** | ~$0.06/min | 10x more expensive than Whisper (not implemented) |
+
+> **Why no OpenAI Realtime?** We initially implemented OpenAI's Realtime API for true streaming transcription, but removed it due to cost concerns (~$0.06/min vs Whisper's ~$0.006/min) and inconsistent transcription quality. The Whisper batch API with 2-second re-transcription intervals provides better value and more reliable results for most use cases.
 
 ## Usage
 
 1. **Start the application** - The overlay window appears and the app minimizes to the system tray
 2. **Press Ctrl+Ctrl** (double-tap Ctrl) - Start listening for speech
-3. **Speak** - Your words appear in real-time in the overlay
+3. **Speak** - Your words appear in real-time in the overlay (with elapsed time shown)
 4. **Press Ctrl+Ctrl again** - Stop listening and copy text to clipboard
-5. **Paste** (Ctrl+V / Cmd+V) - Paste your transcribed text anywhere
+5. **Done!** - Text is copied to clipboard, or automatically inserted at cursor if enabled
+
+> **Tip:** Enable "Insert transcription at cursor" in Settings to have text automatically pasted into your active application when you stop recording.
 
 ### System Tray
 
 The tray icon changes color to indicate the current state:
 - **Gray**: Idle/Ready
+- **Gray + Red dot**: Update available
 - **Green**: Listening
 - **Orange**: Processing
 - **Red**: Error
 
 Actions:
 - **Click** the tray icon to toggle the overlay
-- **Right-click** for options: Show/Hide Overlay, Settings, Exit
+- **Right-click** for options: Show/Hide Overlay, Settings, Update (when available), Exit
 
 ## Settings
 
-### Speech Provider
+Settings are organized into three tabs: **General**, **Advanced**, and **About**.
+
+### Speech Provider (General Tab)
 - **Offline (Windows only)**: Uses Windows built-in speech recognition - no internet required
 - **Azure Speech Service**: Cloud-based recognition with real-time streaming
-- **OpenAI Whisper (Batch)**: Re-transcribes entire audio every 2 seconds
-- **OpenAI Realtime**: True streaming transcription via WebSocket (lowest latency)
+- **OpenAI Whisper (Batch)**: Re-transcribes entire audio every 2 seconds for pseudo-streaming
 
 ### Cloud Service Setup
 
@@ -115,23 +131,13 @@ Actions:
 3. Open Settings and select "Azure" as the speech provider
 4. Enter your subscription key and region
 
-#### OpenAI (Whisper & Realtime)
-
-Both OpenAI providers use the same API key.
+#### OpenAI Whisper
 
 1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Open Settings and enter your OpenAI API key
-3. Select either:
-   - **OpenAI Whisper (Batch)**: Better for longer recordings, re-transcribes every 2s
-   - **OpenAI Realtime (Streaming)**: True real-time streaming, lower latency
+3. Select **OpenAI Whisper** as the speech provider
 
-**Note on OpenAI Realtime API:**
-- Uses the `gpt-4o-realtime-preview` model with Whisper for transcription
-- Requires WebSocket connection to OpenAI servers
-- Audio is streamed at 24kHz PCM16 mono format
-- Provides instant transcription as you speak
-- Currently Windows-only (requires NAudio for audio capture)
-- ⚠️ **Cost Warning**: Realtime API costs ~$0.06/min vs Whisper's ~$0.006/min (10x more expensive)
+Whisper provides excellent transcription quality at a low cost (~$0.006/min). It re-transcribes the entire audio every 2 seconds for pseudo-streaming updates.
 
 ## Building from Source
 
@@ -253,8 +259,25 @@ Global keyboard hooks require X11. If using Wayland:
 - Try running with `XDG_SESSION_TYPE=x11`
 - Or use XWayland compatibility mode
 
+### Debug Logging
+
+If you're experiencing issues, enable debug logging in Settings to help diagnose problems:
+
+1. Open **Settings** from the system tray menu
+2. Go to the **Advanced** tab
+3. Check **Enable Debug Logging**
+4. Click **Save**
+5. Reproduce the issue
+6. Find log files at:
+   - **Windows**: `%AppData%\WisprClone\logs\wispr_YYYY-MM-DD.log`
+   - **macOS/Linux**: `~/.config/WisprClone/logs/wispr_YYYY-MM-DD.log`
+
+Logging takes effect immediately - no restart required.
+
 ## Version History
 
+- **2.4.x** - Insert at cursor, elapsed time display, tabbed settings, centralized logging
+- **2.3.x** - Auto-scroll overlay, update notifications with red dot indicator, UX improvements
 - **2.0.0** - Cross-platform support (Windows, macOS, Linux) using Avalonia UI
 - **1.2.0** - Added About dialog, version display in settings
 - **1.1.0** - Added installer with version checking, icon pack, logging options
