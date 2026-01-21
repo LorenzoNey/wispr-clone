@@ -122,8 +122,13 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
             -p:Version=${{ steps.version.outputs.VERSION }} \
             -o ./publish/WisprClone.app/Contents/MacOS
+
+          # Remove any pdb files that might have been created
+          find ./publish -name "*.pdb" -delete
 
       - name: Create app icon (icns)
         run: |
@@ -195,8 +200,11 @@ jobs:
           SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "Using signing identity: $SIGNING_IDENTITY"
 
-          # Sign all binaries and dylibs in the app bundle
-          find ./publish/WisprClone.app -type f \( -name "*.dylib" -o -perm +111 \) -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp {} \;
+          # Sign all dylibs first
+          find ./publish/WisprClone.app -name "*.dylib" -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp {} \;
+
+          # Sign the main executable
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp ./publish/WisprClone.app/Contents/MacOS/WisprClone
 
           # Sign the main app bundle
           codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp ./publish/WisprClone.app
@@ -306,8 +314,13 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
             -p:Version=${{ steps.version.outputs.VERSION }} \
             -o ./publish/WisprClone.app/Contents/MacOS
+
+          # Remove any pdb files that might have been created
+          find ./publish -name "*.pdb" -delete
 
       - name: Create app icon (icns)
         run: |
@@ -379,8 +392,11 @@ jobs:
           SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "Using signing identity: $SIGNING_IDENTITY"
 
-          # Sign all binaries and dylibs in the app bundle
-          find ./publish/WisprClone.app -type f \( -name "*.dylib" -o -perm +111 \) -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp {} \;
+          # Sign all dylibs first
+          find ./publish/WisprClone.app -name "*.dylib" -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp {} \;
+
+          # Sign the main executable
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp ./publish/WisprClone.app/Contents/MacOS/WisprClone
 
           # Sign the main app bundle
           codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp ./publish/WisprClone.app
