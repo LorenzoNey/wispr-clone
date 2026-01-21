@@ -303,4 +303,32 @@ public partial class SettingsWindow : Window
     {
         Close();
     }
+
+    private void RevealAzureKeyButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (AzureKeyTextBox.PasswordChar == '*')
+        {
+            AzureKeyTextBox.PasswordChar = '\0';
+            RevealAzureKeyButton.Content = "Hide";
+        }
+        else
+        {
+            AzureKeyTextBox.PasswordChar = '*';
+            RevealAzureKeyButton.Content = "Show";
+        }
+    }
+
+    private void RevealOpenAIKeyButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (OpenAIKeyTextBox.PasswordChar == '*')
+        {
+            OpenAIKeyTextBox.PasswordChar = '\0';
+            RevealOpenAIKeyButton.Content = "Hide";
+        }
+        else
+        {
+            OpenAIKeyTextBox.PasswordChar = '*';
+            RevealOpenAIKeyButton.Content = "Show";
+        }
+    }
 }

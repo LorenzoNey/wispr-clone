@@ -183,7 +183,16 @@
                                     <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
 
                                     <TextBlock Text="Subscription Key" Classes="label"/>
-                                    <TextBox x:Name="AzureKeyTextBox" Classes="settings" Width="300" HorizontalAlignment="Left" PasswordChar="*"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="AzureKeyTextBox" Classes="settings" Width="300" PasswordChar="*"/>
+                                        <Button x:Name="RevealAzureKeyButton"
+                                                Content="Show"
+                                                Classes="secondary"
+                                                Click="RevealAzureKeyButton_Click"
+                                                VerticalAlignment="Center"
+                                                Padding="12,8"
+                                                Margin="8,0,0,0"/>
+                                    </StackPanel>
 
                                     <TextBlock Text="Region" Classes="label" Margin="0,12,0,6"/>
                                     <TextBox x:Name="AzureRegionTextBox" Classes="settings" Width="120" HorizontalAlignment="Left"/>
@@ -199,7 +208,16 @@
                                     <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
 
                                     <TextBlock Text="API Key" Classes="label"/>
-                                    <TextBox x:Name="OpenAIKeyTextBox" Classes="settings" Width="300" HorizontalAlignment="Left" PasswordChar="*"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="OpenAIKeyTextBox" Classes="settings" Width="300" PasswordChar="*"/>
+                                        <Button x:Name="RevealOpenAIKeyButton"
+                                                Content="Show"
+                                                Classes="secondary"
+                                                Click="RevealOpenAIKeyButton_Click"
+                                                VerticalAlignment="Center"
+                                                Padding="12,8"
+                                                Margin="8,0,0,0"/>
+                                    </StackPanel>
 
                                     <TextBlock Text="Used for Whisper batch API. Re-transcribes entire audio every 2s."
                                                Classes="info"/>
