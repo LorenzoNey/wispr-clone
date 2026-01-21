@@ -5,12 +5,13 @@ namespace WisprClone.Services.Speech;
 
 /// <summary>
 /// Cross-platform speech service manager for non-Windows platforms.
-/// Only supports cloud providers (Azure and OpenAI Whisper).
+/// Supports cloud providers (Azure and OpenAI Whisper) and native macOS speech.
 /// </summary>
 public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
 {
     private readonly AzureSpeechRecognitionService _azureService;
     private readonly OpenAIWhisperSpeechRecognitionService _whisperService;
+    private readonly MacOSSpeechRecognitionService? _macOSService;
     private readonly ISettingsService _settingsService;
     private readonly ILoggingService _loggingService;
 
@@ -32,20 +33,26 @@ public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
     public CrossPlatformSpeechServiceManager(
         AzureSpeechRecognitionService azureService,
         OpenAIWhisperSpeechRecognitionService whisperService,
+        MacOSSpeechRecognitionService? macOSService,
         ISettingsService settingsService,
         ILoggingService loggingService)
     {
         _azureService = azureService;
         _whisperService = whisperService;
+        _macOSService = macOSService;
         _settingsService = settingsService;
         _loggingService = loggingService;
 
-        // Start with Azure as default for non-Windows (more reliable than Whisper without NAudio)
+        // Start with appropriate default based on platform
         _activeService = GetServiceForProvider(settingsService.Current.SpeechProvider);
 
         // Wire up events
         WireEvents(_azureService);
         WireEvents(_whisperService);
+        if (_macOSService != null)
+        {
+            WireEvents(_macOSService);
+        }
 
         // Listen for settings changes
         _settingsService.SettingsChanged += OnSettingsChanged;
@@ -61,12 +68,14 @@ public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
 
     private ISpeechRecognitionService GetServiceForProvider(SpeechProvider provider)
     {
-        // On non-Windows, Offline maps to Azure (no System.Speech available)
         return provider switch
         {
             SpeechProvider.Azure => _azureService,
             SpeechProvider.OpenAI => _whisperService.IsAvailable ? _whisperService : _azureService,
-            SpeechProvider.Offline => _azureService, // Fallback to Azure on non-Windows
+            SpeechProvider.MacOSNative when _macOSService?.IsAvailable == true => _macOSService,
+            SpeechProvider.MacOSNative => _azureService, // Fallback to Azure if macOS native unavailable
+            SpeechProvider.Offline when _macOSService?.IsAvailable == true => _macOSService, // On macOS, Offline maps to native
+            SpeechProvider.Offline => _azureService, // Fallback to Azure on Linux or if unavailable
             _ => _azureService
         };
     }
@@ -92,11 +101,18 @@ public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
         switch (settings.SpeechProvider)
         {
             case SpeechProvider.Azure:
-            case SpeechProvider.Offline: // Offline falls back to Azure
                 _azureService.Configure(settings.AzureSubscriptionKey, settings.AzureRegion);
                 break;
             case SpeechProvider.OpenAI:
                 _whisperService.Configure(settings.OpenAIApiKey ?? string.Empty);
+                break;
+            case SpeechProvider.MacOSNative:
+                // macOS native doesn't need additional configuration
+                break;
+            case SpeechProvider.Offline:
+                // On macOS, offline maps to native; otherwise fallback to Azure
+                if (_macOSService?.IsAvailable != true)
+                    _azureService.Configure(settings.AzureSubscriptionKey, settings.AzureRegion);
                 break;
         }
 
@@ -171,6 +187,7 @@ public class CrossPlatformSpeechServiceManager : ISpeechRecognitionService
 
         _azureService.Dispose();
         _whisperService.Dispose();
+        _macOSService?.Dispose();
     }
 
     private void Log(string message)

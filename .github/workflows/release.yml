@@ -148,6 +148,16 @@ jobs:
           # Remove any pdb files that might have been created
           find ./publish -name "*.pdb" -delete
 
+      - name: Build Swift Speech Helper
+        run: |
+          # Compile the Swift helper for arm64
+          swiftc -O -target arm64-apple-macos10.15 \
+            -o ./publish/WisprClone.app/Contents/MacOS/MacOSSpeechHelper \
+            src/MacOSSpeechHelper/main.swift
+
+          # Make it executable
+          chmod +x ./publish/WisprClone.app/Contents/MacOS/MacOSSpeechHelper
+
       - name: Create app icon (icns)
         run: |
           # Create iconset directory
@@ -203,6 +213,8 @@ jobs:
               <true/>
               <key>NSMicrophoneUsageDescription</key>
               <string>WisprClone needs microphone access for speech recognition.</string>
+              <key>NSSpeechRecognitionUsageDescription</key>
+              <string>WisprClone needs speech recognition access for native macOS transcription.</string>
           </dict>
           </plist>
           EOF
@@ -354,6 +366,16 @@ jobs:
           # Remove any pdb files that might have been created
           find ./publish -name "*.pdb" -delete
 
+      - name: Build Swift Speech Helper
+        run: |
+          # Compile the Swift helper for x64
+          swiftc -O -target x86_64-apple-macos10.15 \
+            -o ./publish/WisprClone.app/Contents/MacOS/MacOSSpeechHelper \
+            src/MacOSSpeechHelper/main.swift
+
+          # Make it executable
+          chmod +x ./publish/WisprClone.app/Contents/MacOS/MacOSSpeechHelper
+
       - name: Create app icon (icns)
         run: |
           # Create iconset directory
@@ -409,6 +431,8 @@ jobs:
               <true/>
               <key>NSMicrophoneUsageDescription</key>
               <string>WisprClone needs microphone access for speech recognition.</string>
+              <key>NSSpeechRecognitionUsageDescription</key>
+              <string>WisprClone needs speech recognition access for native macOS transcription.</string>
           </dict>
           </plist>
           EOF

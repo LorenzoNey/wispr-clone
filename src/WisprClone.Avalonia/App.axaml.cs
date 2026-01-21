@@ -309,16 +309,25 @@ public partial class App : Application
                 settings);
         });
 #else
-        // macOS/Linux: Cloud providers only (Azure + OpenAI)
+        // macOS/Linux: Cloud providers + native macOS speech
+        services.AddSingleton<MacOSSpeechRecognitionService>();
         services.AddSingleton<ISpeechRecognitionService>(sp =>
         {
             var settings = sp.GetRequiredService<ISettingsService>();
             var logging = sp.GetRequiredService<ILoggingService>();
             logging.Log("App", $"Initial speech provider (non-Windows): {settings.Current.SpeechProvider}");
 
+            // macOS native service is only available on macOS
+            MacOSSpeechRecognitionService? macOSService = null;
+            if (OperatingSystem.IsMacOS())
+            {
+                macOSService = sp.GetRequiredService<MacOSSpeechRecognitionService>();
+            }
+
             return new CrossPlatformSpeechServiceManager(
                 sp.GetRequiredService<AzureSpeechRecognitionService>(),
                 sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
+                macOSService,
                 settings,
                 logging);
         });

@@ -25,5 +25,11 @@ public enum SpeechProvider
     /// Cloud recognition using OpenAI Realtime API (true streaming via WebSocket).
     /// Provides real-time transcription with lower latency than batch Whisper.
     /// </summary>
-    OpenAIRealtime
+    OpenAIRealtime,
+
+    /// <summary>
+    /// Native macOS speech recognition using Apple's Speech Framework (SFSpeechRecognizer).
+    /// Only available on macOS. Provides on-device recognition with no API costs.
+    /// </summary>
+    MacOSNative
 }
