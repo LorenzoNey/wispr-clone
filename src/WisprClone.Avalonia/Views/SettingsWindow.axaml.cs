@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using WisprClone.Core;
@@ -275,21 +277,46 @@ public partial class SettingsWindow : Window
             var filePath = await _updateService.DownloadUpdateAsync(progress);
             if (filePath != null)
             {
-                DownloadStatusText.Text = "Download complete! Opening...";
                 DownloadProgressBar.Value = 100;
-                _updateService.LaunchInstaller(filePath);
+
+                if (OperatingSystem.IsMacOS())
+                {
+                    // macOS: Show install button for automated update
+                    DownloadStatusText.Text = "Download complete! Click Install to quit and update.";
+                    DownloadUpdateButton.Content = "Install Update";
+                    DownloadUpdateButton.IsEnabled = true;
+                    DownloadUpdateButton.Click -= DownloadUpdateButton_Click;
+                    DownloadUpdateButton.Click += (_, _) =>
+                    {
+                        DownloadUpdateButton.IsEnabled = false;
+                        DownloadStatusText.Text = "Installing... The app will restart.";
+                        _updateService.LaunchMacOSUpdate(filePath, () =>
+                        {
+                            // Quit the application
+                            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+                            {
+                                lifetime.Shutdown();
+                            }
+                        });
+                    };
+                }
+                else
+                {
+                    // Windows/Linux: Launch installer directly
+                    DownloadStatusText.Text = "Download complete! Opening...";
+                    _updateService.LaunchInstaller(filePath);
+                    DownloadUpdateButton.IsEnabled = true;
+                }
             }
             else
             {
                 DownloadStatusText.Text = "Download failed. Please try again.";
+                DownloadUpdateButton.IsEnabled = true;
             }
         }
         catch (Exception ex)
         {
             DownloadStatusText.Text = $"Download failed: {ex.Message}";
-        }
-        finally
-        {
             DownloadUpdateButton.IsEnabled = true;
         }
     }

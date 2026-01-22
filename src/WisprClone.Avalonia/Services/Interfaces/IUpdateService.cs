@@ -73,4 +73,13 @@ public interface IUpdateService : IDisposable
     /// </summary>
     /// <param name="installerPath">Path to the downloaded file.</param>
     void LaunchInstaller(string installerPath);
+
+    /// <summary>
+    /// Launches the macOS update process using a shell script.
+    /// This method creates a script that waits for the app to quit,
+    /// mounts the DMG, copies the new app, and relaunches.
+    /// </summary>
+    /// <param name="dmgPath">Path to the downloaded DMG file.</param>
+    /// <param name="onBeforeQuit">Optional callback invoked before the app should quit.</param>
+    void LaunchMacOSUpdate(string dmgPath, Action? onBeforeQuit = null);
 }

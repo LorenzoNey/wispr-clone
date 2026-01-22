@@ -238,6 +238,9 @@ public class MacOSSpeechRecognitionService : ISpeechRecognitionService
                 case "partial":
                     if (message.Text != null)
                     {
+                        // Update buffer with latest accumulated text from helper
+                        _transcriptionBuffer.Clear();
+                        _transcriptionBuffer.Append(message.Text);
                         RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(message.Text, false, false));
                     }
                     break;

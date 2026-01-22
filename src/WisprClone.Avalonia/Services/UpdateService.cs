@@ -226,8 +226,13 @@ public class UpdateService : IUpdateService
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            // macOS DMG is named "WisprClone-macOS-arm64-X.X.X.dmg"
-            assetPatterns = ["macOS-arm64"];
+            // macOS DMG is named "WisprClone-macOS-{arch}-X.X.X.dmg"
+            // Detect architecture: ARM64 (Apple Silicon) vs x64 (Intel)
+            var arch = RuntimeInformation.ProcessArchitecture;
+            if (arch == Architecture.Arm64)
+                assetPatterns = ["macOS-arm64"];
+            else
+                assetPatterns = ["macOS-x64"];
         }
         else // Linux
         {
@@ -276,6 +281,74 @@ public class UpdateService : IUpdateService
         catch
         {
             // Silently fail
+        }
+    }
+
+    public void LaunchMacOSUpdate(string dmgPath, Action? onBeforeQuit = null)
+    {
+        if (!OperatingSystem.IsMacOS() || !File.Exists(dmgPath))
+            return;
+
+        try
+        {
+            var currentPid = Environment.ProcessId;
+            var appPath = "/Applications/WisprClone.app";
+
+            // Create updater script
+            var scriptPath = Path.Combine(Path.GetTempPath(), "wispr-update.sh");
+            var script = $@"#!/bin/bash
+# WisprClone macOS Updater
+# Wait for app to quit
+while kill -0 {currentPid} 2>/dev/null; do sleep 0.5; done
+
+# Mount DMG silently
+MOUNT_OUTPUT=$(hdiutil attach ""{dmgPath}"" -nobrowse -quiet 2>&1)
+MOUNT_POINT=$(echo ""$MOUNT_OUTPUT"" | grep -o '/Volumes/[^""]*' | head -1)
+if [ -z ""$MOUNT_POINT"" ]; then
+    MOUNT_POINT=""/Volumes/WisprClone""
+fi
+
+# Wait for mount
+sleep 1
+
+# Copy app to Applications (overwrite existing)
+if [ -d ""$MOUNT_POINT/WisprClone.app"" ]; then
+    rm -rf ""{appPath}""
+    cp -R ""$MOUNT_POINT/WisprClone.app"" ""/Applications/""
+fi
+
+# Unmount DMG
+hdiutil detach ""$MOUNT_POINT"" -quiet 2>/dev/null
+
+# Clean up DMG
+rm -f ""{dmgPath}""
+
+# Relaunch app
+open ""{appPath}""
+";
+
+            File.WriteAllText(scriptPath, script);
+
+            // Make executable
+            Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
+
+            // Launch script in background
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "/bin/bash",
+                Arguments = $"\"{scriptPath}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            Log($"macOS update script launched: {scriptPath}");
+
+            // Notify caller to quit
+            onBeforeQuit?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Log($"LaunchMacOSUpdate error: {ex.Message}");
         }
     }
 

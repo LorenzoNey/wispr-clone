@@ -51,7 +51,9 @@ class SpeechRecognitionManager {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var currentTranscription = ""
+    private var accumulatedTranscription = ""  // Text from completed segments
     private var isListening = false
+    private var isRestarting = false  // Prevent restart loops
 
     init?(locale: Locale) {
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
@@ -80,6 +82,7 @@ class SpeechRecognitionManager {
         }
 
         do {
+            accumulatedTranscription = ""  // Clear accumulated text on fresh start
             try startRecognition()
             isListening = true
             sendState("listening")
@@ -118,10 +121,33 @@ class SpeechRecognitionManager {
                 let transcription = result.bestTranscription.formattedString
                 self.currentTranscription = transcription
 
+                // Combine accumulated text with current segment
+                let fullText = self.accumulatedTranscription.isEmpty
+                    ? transcription
+                    : self.accumulatedTranscription + " " + transcription
+
                 if result.isFinal {
-                    sendFinal(transcription)
+                    // Segment completed (possibly due to silence)
+                    // Save this segment to accumulated text
+                    if !transcription.isEmpty {
+                        if self.accumulatedTranscription.isEmpty {
+                            self.accumulatedTranscription = transcription
+                        } else {
+                            self.accumulatedTranscription += " " + transcription
+                        }
+                    }
+
+                    // Send the full accumulated text as partial (not final, since we're still listening)
+                    if self.isListening && !self.isRestarting {
+                        sendPartial(self.accumulatedTranscription)
+
+                        // Restart recognition to continue listening
+                        self.restartRecognition()
+                    } else {
+                        sendFinal(fullText)
+                    }
                 } else {
-                    sendPartial(transcription)
+                    sendPartial(fullText)
                 }
             }
 
@@ -130,28 +156,136 @@ class SpeechRecognitionManager {
                 let nsError = error as NSError
                 if nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110 {
                     // This is "No speech detected" - not an error, just silence
+                    // Restart recognition if we're still supposed to be listening
+                    if self.isListening && !self.isRestarting {
+                        self.restartRecognition()
+                    }
+                    return
+                }
+                // Code 216 is also a common "end of utterance" error
+                if nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216 {
+                    if self.isListening && !self.isRestarting {
+                        self.restartRecognition()
+                    }
                     return
                 }
                 sendError("Recognition error: \(error.localizedDescription)")
             }
         }
 
-        // Configure audio input
+        // Configure audio input (only if not already configured)
         let inputNode = audioEngine.inputNode
+
+        // Remove existing tap if any
+        inputNode.removeTap(onBus: 0)
+
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
         }
 
-        audioEngine.prepare()
-        try audioEngine.start()
+        if !audioEngine.isRunning {
+            audioEngine.prepare()
+            try audioEngine.start()
+        }
+    }
+
+    private func restartRecognition() {
+        guard isListening && !isRestarting else { return }
+
+        isRestarting = true
+
+        // End current request
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        // Small delay before restarting
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self, self.isListening else {
+                self?.isRestarting = false
+                return
+            }
+
+            do {
+                // Don't clear accumulated - we want to keep it
+                self.currentTranscription = ""
+
+                // Create new recognition request
+                self.recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+                guard let recognitionRequest = self.recognitionRequest else {
+                    self.isRestarting = false
+                    return
+                }
+
+                recognitionRequest.shouldReportPartialResults = true
+                if #available(macOS 10.15, *) {
+                    recognitionRequest.requiresOnDeviceRecognition = self.speechRecognizer.supportsOnDeviceRecognition
+                }
+
+                // Start new recognition task
+                self.recognitionTask = self.speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                    guard let self = self else { return }
+
+                    if let result = result {
+                        let transcription = result.bestTranscription.formattedString
+                        self.currentTranscription = transcription
+
+                        let fullText = self.accumulatedTranscription.isEmpty
+                            ? transcription
+                            : self.accumulatedTranscription + " " + transcription
+
+                        if result.isFinal {
+                            if !transcription.isEmpty {
+                                if self.accumulatedTranscription.isEmpty {
+                                    self.accumulatedTranscription = transcription
+                                } else {
+                                    self.accumulatedTranscription += " " + transcription
+                                }
+                            }
+
+                            if self.isListening && !self.isRestarting {
+                                sendPartial(self.accumulatedTranscription)
+                                self.restartRecognition()
+                            } else {
+                                sendFinal(fullText)
+                            }
+                        } else {
+                            sendPartial(fullText)
+                        }
+                    }
+
+                    if let error = error {
+                        let nsError = error as NSError
+                        if nsError.domain == "kAFAssistantErrorDomain" && (nsError.code == 1110 || nsError.code == 216) {
+                            if self.isListening && !self.isRestarting {
+                                self.restartRecognition()
+                            }
+                            return
+                        }
+                        sendError("Recognition error: \(error.localizedDescription)")
+                    }
+                }
+
+                self.isRestarting = false
+            } catch {
+                sendError("Failed to restart recognition: \(error.localizedDescription)")
+                self.isRestarting = false
+            }
+        }
     }
 
     func stopListening() -> String {
-        guard isListening else { return currentTranscription }
+        guard isListening else {
+            // Return whatever we have accumulated
+            let result = accumulatedTranscription.isEmpty ? currentTranscription : accumulatedTranscription
+            return result
+        }
 
         isListening = false
+        isRestarting = false  // Ensure we don't restart
 
         // Stop audio engine
         audioEngine.stop()
@@ -167,7 +301,21 @@ class SpeechRecognitionManager {
 
         sendState("idle")
 
-        return currentTranscription
+        // Return full accumulated text plus any current segment
+        let finalText: String
+        if accumulatedTranscription.isEmpty {
+            finalText = currentTranscription
+        } else if currentTranscription.isEmpty {
+            finalText = accumulatedTranscription
+        } else {
+            finalText = accumulatedTranscription + " " + currentTranscription
+        }
+
+        // Reset for next session
+        accumulatedTranscription = ""
+        currentTranscription = ""
+
+        return finalText
     }
 }
 

@@ -89,6 +89,12 @@ public partial class App : Application
         // Setup system tray
         SetupTrayIcon();
 
+        // Setup macOS application menu
+        if (OperatingSystem.IsMacOS())
+        {
+            SetupMacOSMenu();
+        }
+
         // Initialize update checking
         InitializeUpdateChecking();
 
@@ -366,6 +372,90 @@ public partial class App : Application
         // Store reference to prevent garbage collection
         _trayIcons = new TrayIcons { _trayIcon };
         TrayIcon.SetIcons(this, _trayIcons);
+    }
+
+    private void SetupMacOSMenu()
+    {
+        var trayViewModel = _serviceProvider.GetRequiredService<SystemTrayViewModel>();
+
+        // Create the application menu (the one that appears under the app name)
+        var appMenu = new NativeMenu();
+
+        var aboutItem = new NativeMenuItem("About WisprClone");
+        aboutItem.Click += (_, _) => SafeExecute(() => trayViewModel.OpenAboutCommand.Execute(null), "About");
+        appMenu.Items.Add(aboutItem);
+
+        appMenu.Items.Add(new NativeMenuItemSeparator());
+
+        var settingsItem = new NativeMenuItem("Settings...")
+        {
+            // Cmd+, is the standard macOS shortcut for settings/preferences
+            Gesture = new Avalonia.Input.KeyGesture(Avalonia.Input.Key.OemComma, Avalonia.Input.KeyModifiers.Meta)
+        };
+        settingsItem.Click += (_, _) => SafeExecute(() => trayViewModel.OpenSettingsCommand.Execute(null), "Settings");
+        appMenu.Items.Add(settingsItem);
+
+        appMenu.Items.Add(new NativeMenuItemSeparator());
+
+        var hideItem = new NativeMenuItem("Hide WisprClone")
+        {
+            Gesture = new Avalonia.Input.KeyGesture(Avalonia.Input.Key.H, Avalonia.Input.KeyModifiers.Meta)
+        };
+        hideItem.Click += (_, _) => SafeExecute(() => trayViewModel.HideOverlayCommand.Execute(null), "Hide");
+        appMenu.Items.Add(hideItem);
+
+        var hideOthersItem = new NativeMenuItem("Hide Others")
+        {
+            Gesture = new Avalonia.Input.KeyGesture(Avalonia.Input.Key.H, Avalonia.Input.KeyModifiers.Meta | Avalonia.Input.KeyModifiers.Alt)
+        };
+        appMenu.Items.Add(hideOthersItem);
+
+        var showAllItem = new NativeMenuItem("Show All");
+        appMenu.Items.Add(showAllItem);
+
+        appMenu.Items.Add(new NativeMenuItemSeparator());
+
+        var quitItem = new NativeMenuItem("Quit WisprClone")
+        {
+            Gesture = new Avalonia.Input.KeyGesture(Avalonia.Input.Key.Q, Avalonia.Input.KeyModifiers.Meta)
+        };
+        quitItem.Click += (_, _) =>
+        {
+            Log("Quit clicked from menu - forcing cleanup...");
+            ForceCleanupAndExit();
+        };
+        appMenu.Items.Add(quitItem);
+
+        // Create the View menu for overlay controls
+        var viewMenu = new NativeMenu();
+
+        var showOverlayItem = new NativeMenuItem("Show Overlay");
+        showOverlayItem.Click += (_, _) => SafeExecute(() => trayViewModel.ShowOverlayCommand.Execute(null), "Show Overlay");
+        viewMenu.Items.Add(showOverlayItem);
+
+        var hideOverlayItem = new NativeMenuItem("Hide Overlay");
+        hideOverlayItem.Click += (_, _) => SafeExecute(() => trayViewModel.HideOverlayCommand.Execute(null), "Hide Overlay");
+        viewMenu.Items.Add(hideOverlayItem);
+
+        // Create the main menu bar
+        var menuBar = new NativeMenu();
+
+        // Add the app menu (this becomes the "WisprClone" menu in the menu bar)
+        var appMenuItem = new NativeMenuItem("WisprClone")
+        {
+            Menu = appMenu
+        };
+        menuBar.Items.Add(appMenuItem);
+
+        // Add the View menu
+        var viewMenuItem = new NativeMenuItem("View")
+        {
+            Menu = viewMenu
+        };
+        menuBar.Items.Add(viewMenuItem);
+
+        // Set the menu on the application
+        NativeMenu.SetMenu(this, menuBar);
     }
 
     private NativeMenu CreateTrayMenu(SystemTrayViewModel viewModel)
