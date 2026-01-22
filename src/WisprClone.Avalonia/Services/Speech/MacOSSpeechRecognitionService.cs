@@ -80,13 +80,26 @@ public class MacOSSpeechRecognitionService : ISpeechRecognitionService
     public async Task InitializeAsync(string language = "en-US")
     {
         Log($"InitializeAsync called with language: {language}");
-        CurrentLanguage = language;
 
         if (!OperatingSystem.IsMacOS())
         {
             Log("Not running on macOS, service unavailable");
             return;
         }
+
+        // If already initialized, just update the language
+        if (_isInitialized && _helperProcess != null && !_helperProcess.HasExited)
+        {
+            Log($"Already initialized, updating language to: {language}");
+            if (language != CurrentLanguage)
+            {
+                CurrentLanguage = language;
+                await SendCommand(new { action = "setLanguage", locale = language });
+            }
+            return;
+        }
+
+        CurrentLanguage = language;
 
         var helperPath = GetHelperPath();
         if (string.IsNullOrEmpty(helperPath) || !File.Exists(helperPath))

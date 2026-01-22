@@ -13,4 +13,11 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
+
+    <!-- Native menu for macOS - overrides default "About Avalonia" -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="About WisprClone" Click="AboutMenuItem_Click" />
+        </NativeMenu>
+    </NativeMenu.Menu>
 </Application>
