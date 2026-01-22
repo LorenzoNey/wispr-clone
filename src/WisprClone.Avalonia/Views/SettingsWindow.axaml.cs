@@ -104,28 +104,50 @@ public partial class SettingsWindow : Window
 
     private void UpdateProviderVisibility()
     {
-        // On non-Windows platforms, hide the offline option
-        if (!OperatingSystem.IsWindows())
+        // Platform-specific provider visibility
+        bool isWindows = OperatingSystem.IsWindows();
+        bool isMacOS = OperatingSystem.IsMacOS();
+
+        foreach (var item in SpeechProviderComboBox.Items.Cast<ComboBoxItem>())
         {
-            foreach (var item in SpeechProviderComboBox.Items.Cast<ComboBoxItem>())
+            var tag = item.Tag?.ToString();
+            switch (tag)
             {
-                if (item.Tag?.ToString() == "Offline")
-                {
-                    item.IsVisible = false;
+                case "Offline":
+                    // Windows Speech is only available on Windows
+                    item.IsVisible = isWindows;
                     break;
-                }
+                case "MacOSNative":
+                    // macOS Native Speech is only available on macOS
+                    item.IsVisible = isMacOS;
+                    break;
             }
+        }
 
-            // If Offline was selected, switch to Azure
-            var selectedItem = SpeechProviderComboBox.SelectedItem as ComboBoxItem;
-            if (selectedItem?.Tag?.ToString() == "Offline")
-            {
-                SelectComboBoxItemByTag(SpeechProviderComboBox, "Azure");
-            }
+        // Handle selection if current provider is not available on this platform
+        var selectedItem = SpeechProviderComboBox.SelectedItem as ComboBoxItem;
+        var selectedTag = selectedItem?.Tag?.ToString();
 
-            // Update the info text
-            ProviderInfoText.Text = "Note: Offline speech recognition is only available on Windows. " +
-                                    "On macOS and Linux, use Azure or OpenAI cloud services.";
+        if (selectedTag == "Offline" && !isWindows)
+        {
+            // On macOS, default to MacOSNative; on Linux, default to Azure
+            SelectComboBoxItemByTag(SpeechProviderComboBox, isMacOS ? "MacOSNative" : "Azure");
+        }
+        else if (selectedTag == "MacOSNative" && !isMacOS)
+        {
+            // On Windows, default to Offline; on Linux, default to Azure
+            SelectComboBoxItemByTag(SpeechProviderComboBox, isWindows ? "Offline" : "Azure");
+        }
+
+        // Update info text based on platform
+        if (isMacOS)
+        {
+            ProviderInfoText.Text = "macOS Native Speech uses Apple's on-device recognition (no API costs). " +
+                                    "Cloud providers (Azure, OpenAI) are also available.";
+        }
+        else if (!isWindows)
+        {
+            ProviderInfoText.Text = "Note: On Linux, only cloud providers (Azure, OpenAI) are available.";
         }
     }
 
