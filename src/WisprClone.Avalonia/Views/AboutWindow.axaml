@@ -39,7 +39,7 @@
                        TextAlignment="Center"
                        Margin="0,0,0,8"/>
 
-            <TextBlock Text="Powered by Azure Speech Services and OpenAI Whisper"
+            <TextBlock Text="Powered by Azure Speech and OpenAI Whisper"
                        Foreground="#FF808080"
                        FontSize="11"
                        HorizontalAlignment="Center"

@@ -169,10 +169,10 @@
                                           Width="250"
                                           HorizontalAlignment="Left"
                                           SelectionChanged="SpeechProviderComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Offline (Windows Speech)" Tag="Offline" IsSelected="True"/>
-                                    <ComboBoxItem Content="macOS Native Speech" Tag="MacOSNative"/>
-                                    <ComboBoxItem Content="Azure Speech Service" Tag="Azure"/>
-                                    <ComboBoxItem Content="OpenAI Whisper (Batch)" Tag="OpenAI"/>
+                                    <ComboBoxItem Content="Local (Windows Speech)" Tag="Offline" IsSelected="True"/>
+                                    <ComboBoxItem Content="Local (macOS Speech)" Tag="MacOSNative"/>
+                                    <ComboBoxItem Content="Azure Speech" Tag="Azure"/>
+                                    <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI"/>
                                 </ComboBox>
 
                                 <TextBlock x:Name="ProviderInfoText"

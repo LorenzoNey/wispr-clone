@@ -71,7 +71,7 @@ public partial class OverlayViewModel : ViewModelBase
     private double _windowTop;
 
     [ObservableProperty]
-    private string _providerInfo = "Offline";
+    private string _providerInfo = "Local";
 
     [ObservableProperty]
     private string _languageDisplay = "en-US";
@@ -164,14 +164,18 @@ public partial class OverlayViewModel : ViewModelBase
         // Initialize provider options (OpenAI Realtime temporarily disabled due to cost/quality)
         var providerOptions = new ObservableCollection<ProviderOption>
         {
-            new() { Provider = SpeechProvider.Azure, DisplayName = "Azure" },
-            new() { Provider = SpeechProvider.OpenAI, DisplayName = "Whisper" }
+            new() { Provider = SpeechProvider.Azure, DisplayName = "Azure Speech" },
+            new() { Provider = SpeechProvider.OpenAI, DisplayName = "OpenAI Whisper" }
         };
 
-        // Add Offline option only on Windows
+        // Add platform-specific local speech options
         if (OperatingSystem.IsWindows())
         {
-            providerOptions.Insert(0, new ProviderOption { Provider = SpeechProvider.Offline, DisplayName = "Offline" });
+            providerOptions.Insert(0, new ProviderOption { Provider = SpeechProvider.Offline, DisplayName = "Local" });
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            providerOptions.Insert(0, new ProviderOption { Provider = SpeechProvider.MacOSNative, DisplayName = "Local" });
         }
 
         AvailableProviders = providerOptions;

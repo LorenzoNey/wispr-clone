@@ -142,12 +142,12 @@ public partial class SettingsWindow : Window
         // Update info text based on platform
         if (isMacOS)
         {
-            ProviderInfoText.Text = "macOS Native Speech uses Apple's on-device recognition (no API costs). " +
-                                    "Cloud providers (Azure, OpenAI) are also available.";
+            ProviderInfoText.Text = "Local uses Apple's on-device recognition (no API costs). " +
+                                    "Cloud providers (Azure Speech, OpenAI Whisper) are also available.";
         }
         else if (!isWindows)
         {
-            ProviderInfoText.Text = "Note: On Linux, only cloud providers (Azure, OpenAI) are available.";
+            ProviderInfoText.Text = "Note: On Linux, only cloud providers (Azure Speech, OpenAI Whisper) are available.";
         }
     }
 
