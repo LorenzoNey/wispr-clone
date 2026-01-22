@@ -254,7 +254,8 @@ public partial class App : Application
                 return;
             }
 
-            _aboutWindow = new AboutWindow();
+            var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+            _aboutWindow = new AboutWindow(updateService);
             _aboutWindow.Closed += (_, _) => _aboutWindow = null;
             _aboutWindow.Show();
         }
@@ -466,7 +467,31 @@ public partial class App : Application
 
             if (!string.IsNullOrEmpty(installerPath))
             {
-                _updateService.LaunchInstaller(installerPath);
+                if (OperatingSystem.IsMacOS())
+                {
+                    // macOS: Use automated update flow
+                    if (_updateMenuItem != null)
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            _updateMenuItem.Header = "Installing... Restarting...";
+                        });
+                    }
+
+                    // Small delay to show the message
+                    await Task.Delay(500);
+
+                    _updateService.LaunchMacOSUpdate(installerPath, () =>
+                    {
+                        // Force exit immediately
+                        Environment.Exit(0);
+                    });
+                }
+                else
+                {
+                    // Windows/Linux: Launch installer directly
+                    _updateService.LaunchInstaller(installerPath);
+                }
             }
             else
             {

@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="WisprClone.Views.AboutWindow"
         Title="About WisprClone"
-        Width="400" Height="280"
+        Width="400" Height="380"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
         Background="#FF1E1E1E">
@@ -45,7 +45,42 @@
                        HorizontalAlignment="Center"
                        TextWrapping="Wrap"
                        TextAlignment="Center"
-                       Margin="0,0,0,24"/>
+                       Margin="0,0,0,16"/>
+
+            <!-- Update Section -->
+            <Border Background="#FF2D2D2D"
+                    CornerRadius="6"
+                    Padding="16,12"
+                    Margin="0,0,0,16"
+                    HorizontalAlignment="Stretch">
+                <StackPanel>
+                    <TextBlock x:Name="UpdateStatusText"
+                               Text="Checking for updates..."
+                               Foreground="#FFB0B0B0"
+                               FontSize="12"
+                               HorizontalAlignment="Center"/>
+
+                    <ProgressBar x:Name="UpdateProgressBar"
+                                 IsVisible="False"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Height="4"
+                                 Margin="0,8,0,0"/>
+
+                    <Button x:Name="UpdateButton"
+                            Content="Download Update"
+                            IsVisible="False"
+                            HorizontalAlignment="Center"
+                            HorizontalContentAlignment="Center"
+                            Background="#FF28A745"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Padding="12,6"
+                            CornerRadius="4"
+                            Margin="0,8,0,0"
+                            Click="UpdateButton_Click"/>
+                </StackPanel>
+            </Border>
 
             <!-- Close Button -->
             <Button Content="OK"
