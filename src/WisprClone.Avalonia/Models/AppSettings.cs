@@ -7,23 +7,42 @@ namespace WisprClone.Models;
 /// </summary>
 public class AppSettings
 {
-    // Speech Provider Selection
+    // Speech Provider Selection (STT)
     public SpeechProvider SpeechProvider { get; set; } = SpeechProvider.Offline;
 
-    // Azure Speech Settings
+    // Azure Speech Settings (shared for STT and TTS)
     public string AzureSubscriptionKey { get; set; } = string.Empty;
     public string AzureRegion { get; set; } = "eastus";
     public bool UseAzureFallback { get; set; } = false;
 
-    // OpenAI Whisper Settings
+    // OpenAI Settings (shared for STT and TTS)
     public string OpenAIApiKey { get; set; } = string.Empty;
 
     // Language Settings
     public string RecognitionLanguage { get; set; } = "en-US";
 
-    // Hotkey Settings
+    // STT Hotkey Settings (Ctrl+Ctrl)
     public int DoubleTapIntervalMs { get; set; } = 400;
     public int MaxKeyHoldDurationMs { get; set; } = 200;
+
+    // TTS Provider Selection
+    public TtsProvider TtsProvider { get; set; } = TtsProvider.Offline;
+
+    // TTS Voice Settings
+    public string TtsVoice { get; set; } = string.Empty;
+    public double TtsRate { get; set; } = 1.0;      // 0.5 to 2.0
+    public double TtsVolume { get; set; } = 1.0;    // 0.0 to 1.0
+
+    // OpenAI TTS specific
+    public string OpenAITtsModel { get; set; } = "tts-1";  // or "tts-1-hd"
+    public string OpenAITtsVoice { get; set; } = "alloy";  // alloy/echo/fable/onyx/nova/shimmer
+
+    // Azure TTS specific (reuses AzureSubscriptionKey/AzureRegion)
+    public string AzureTtsVoice { get; set; } = "en-US-JennyNeural";
+
+    // TTS Hotkey Settings (Shift+Shift)
+    public int TtsDoubleTapIntervalMs { get; set; } = 400;
+    public int TtsMaxKeyHoldDurationMs { get; set; } = 200;
 
     // UI Settings
     public double OverlayLeft { get; set; } = 100;

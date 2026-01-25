@@ -28,6 +28,8 @@ public partial class SettingsWindow : Window
         LoadSettings();
         LoadUpdateStatus();
         UpdateApiSettingsPanelVisibility();
+        UpdateTtsSettingsPanelVisibility();
+        SetupTtsSliderEvents();
     }
 
     private void LoadSettings()
@@ -41,7 +43,8 @@ public partial class SettingsWindow : Window
             VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
         }
 
-        // Speech provider
+        // Speech provider - populate options first based on platform
+        PopulateSttProviders();
         SelectComboBoxItemByTag(SpeechProviderComboBox, settings.SpeechProvider.ToString());
 
         // Azure settings
@@ -73,8 +76,24 @@ public partial class SettingsWindow : Window
         // Update settings
         AutoCheckUpdatesCheckBox.IsChecked = settings.CheckForUpdatesAutomatically;
 
-        // Update offline provider visibility based on platform
-        UpdateProviderVisibility();
+        // TTS Provider - populate options first based on platform
+        PopulateTtsProviders();
+        SelectComboBoxItemByTag(TtsProviderComboBox, settings.TtsProvider.ToString());
+        UpdateTtsProviderVisibility(); // Handle invalid selection
+
+        // TTS Voice settings
+        TtsRateSlider.Value = settings.TtsRate;
+        TtsRateValueText.Text = $"{settings.TtsRate:F1}x";
+        TtsVolumeSlider.Value = settings.TtsVolume * 100;
+        TtsVolumeValueText.Text = $"{(int)(settings.TtsVolume * 100)}%";
+
+        // OpenAI TTS settings
+        SelectComboBoxItemByTag(OpenAITtsVoiceComboBox, settings.OpenAITtsVoice);
+        SelectComboBoxItemByTag(OpenAITtsModelComboBox, settings.OpenAITtsModel);
+
+        // Azure TTS settings
+        SelectComboBoxItemByTag(AzureTtsVoiceComboBox, settings.AzureTtsVoice);
+
     }
 
     private void LoadUpdateStatus()
@@ -102,52 +121,40 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void UpdateProviderVisibility()
+    private void PopulateSttProviders()
     {
-        // Platform-specific provider visibility
+        // Dynamically populate STT providers based on platform
         bool isWindows = OperatingSystem.IsWindows();
         bool isMacOS = OperatingSystem.IsMacOS();
 
-        foreach (var item in SpeechProviderComboBox.Items.Cast<ComboBoxItem>())
+        SpeechProviderComboBox.Items.Clear();
+
+        // Add platform-specific local option first
+        if (isWindows)
         {
-            var tag = item.Tag?.ToString();
-            switch (tag)
-            {
-                case "Offline":
-                    // Windows Speech is only available on Windows
-                    item.IsVisible = isWindows;
-                    break;
-                case "MacOSNative":
-                    // macOS Native Speech is only available on macOS
-                    item.IsVisible = isMacOS;
-                    break;
-            }
+            SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (Windows Speech)", Tag = "Offline" });
+        }
+        else if (isMacOS)
+        {
+            SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (macOS Speech)", Tag = "MacOSNative" });
         }
 
-        // Handle selection if current provider is not available on this platform
-        var selectedItem = SpeechProviderComboBox.SelectedItem as ComboBoxItem;
-        var selectedTag = selectedItem?.Tag?.ToString();
-
-        if (selectedTag == "Offline" && !isWindows)
-        {
-            // On macOS, default to MacOSNative; on Linux, default to Azure
-            SelectComboBoxItemByTag(SpeechProviderComboBox, isMacOS ? "MacOSNative" : "Azure");
-        }
-        else if (selectedTag == "MacOSNative" && !isMacOS)
-        {
-            // On Windows, default to Offline; on Linux, default to Azure
-            SelectComboBoxItemByTag(SpeechProviderComboBox, isWindows ? "Offline" : "Azure");
-        }
+        // Add cloud providers (available on all platforms)
+        SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Azure Speech", Tag = "Azure" });
+        SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "OpenAI Whisper", Tag = "OpenAI" });
 
         // Update info text based on platform
         if (isMacOS)
         {
-            ProviderInfoText.Text = "Local uses Apple's on-device recognition (no API costs). " +
-                                    "Cloud providers (Azure Speech, OpenAI Whisper) are also available.";
+            ProviderInfoText.Text = "Ctrl+Ctrl to dictate. Local uses Apple's on-device recognition.";
         }
-        else if (!isWindows)
+        else if (isWindows)
         {
-            ProviderInfoText.Text = "Note: On Linux, only cloud providers (Azure Speech, OpenAI Whisper) are available.";
+            ProviderInfoText.Text = "Ctrl+Ctrl to dictate. Local uses Windows Speech Recognition.";
+        }
+        else
+        {
+            ProviderInfoText.Text = "Ctrl+Ctrl to dictate. On Linux, only cloud providers are available.";
         }
     }
 
@@ -231,6 +238,24 @@ public partial class SettingsWindow : Window
 
             // Update settings
             settings.CheckForUpdatesAutomatically = AutoCheckUpdatesCheckBox.IsChecked ?? true;
+
+            // TTS Provider
+            var ttsProviderTag = GetSelectedComboBoxTag(TtsProviderComboBox);
+            if (Enum.TryParse<TtsProvider>(ttsProviderTag, out var ttsProvider))
+            {
+                settings.TtsProvider = ttsProvider;
+            }
+
+            // TTS Voice settings
+            settings.TtsRate = TtsRateSlider.Value;
+            settings.TtsVolume = TtsVolumeSlider.Value / 100.0;
+
+            // OpenAI TTS settings
+            settings.OpenAITtsVoice = GetSelectedComboBoxTag(OpenAITtsVoiceComboBox) ?? "alloy";
+            settings.OpenAITtsModel = GetSelectedComboBoxTag(OpenAITtsModelComboBox) ?? "tts-1";
+
+            // Azure TTS settings
+            settings.AzureTtsVoice = GetSelectedComboBoxTag(AzureTtsVoiceComboBox) ?? "en-US-JennyNeural";
         });
 
         Close();
@@ -371,5 +396,91 @@ public partial class SettingsWindow : Window
             OpenAIKeyTextBox.PasswordChar = '*';
             RevealOpenAIKeyButton.Content = "Show";
         }
+    }
+
+    private void TtsProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        UpdateTtsSettingsPanelVisibility();
+    }
+
+    private void UpdateTtsSettingsPanelVisibility()
+    {
+        var selectedTag = GetSelectedComboBoxTag(TtsProviderComboBox);
+        OpenAITtsSettingsPanel.IsVisible = selectedTag == "OpenAI";
+        AzureTtsSettingsPanel.IsVisible = selectedTag == "Azure";
+    }
+
+    private void PopulateTtsProviders()
+    {
+        // Dynamically populate TTS providers based on platform
+        bool isWindows = OperatingSystem.IsWindows();
+        bool isMacOS = OperatingSystem.IsMacOS();
+
+        TtsProviderComboBox.Items.Clear();
+
+        // Add platform-specific local option first
+        if (isWindows)
+        {
+            TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (Windows Speech)", Tag = "Offline" });
+        }
+        else if (isMacOS)
+        {
+            TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (macOS Speech)", Tag = "MacOSNative" });
+        }
+
+        // Add cloud providers (available on all platforms)
+        TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "Azure Speech", Tag = "Azure" });
+        TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "OpenAI TTS", Tag = "OpenAI" });
+
+        // Update info text based on platform
+        if (isMacOS)
+        {
+            TtsProviderInfoText.Text = "Shift+Shift to read clipboard. Local uses macOS system voices.";
+        }
+        else if (!isWindows)
+        {
+            TtsProviderInfoText.Text = "Shift+Shift to read clipboard. On Linux, only cloud providers are available.";
+        }
+    }
+
+    private void UpdateTtsProviderVisibility()
+    {
+        // This method now just ensures proper selection after provider list is populated
+        bool isWindows = OperatingSystem.IsWindows();
+        bool isMacOS = OperatingSystem.IsMacOS();
+
+        var selectedItem = TtsProviderComboBox.SelectedItem as ComboBoxItem;
+        var selectedTag = selectedItem?.Tag?.ToString();
+
+        // Handle selection if current provider is not available on this platform
+        if (selectedTag == "Offline" && !isWindows)
+        {
+            // On macOS, default to MacOSNative; on Linux, default to Azure
+            SelectComboBoxItemByTag(TtsProviderComboBox, isMacOS ? "MacOSNative" : "Azure");
+        }
+        else if (selectedTag == "MacOSNative" && !isMacOS)
+        {
+            // On Windows, default to Offline; on Linux, default to Azure
+            SelectComboBoxItemByTag(TtsProviderComboBox, isWindows ? "Offline" : "Azure");
+        }
+    }
+
+    private void SetupTtsSliderEvents()
+    {
+        TtsRateSlider.PropertyChanged += (s, e) =>
+        {
+            if (e.Property.Name == "Value")
+            {
+                TtsRateValueText.Text = $"{TtsRateSlider.Value:F1}x";
+            }
+        };
+
+        TtsVolumeSlider.PropertyChanged += (s, e) =>
+        {
+            if (e.Property.Name == "Value")
+            {
+                TtsVolumeValueText.Text = $"{(int)TtsVolumeSlider.Value}%";
+            }
+        };
     }
 }

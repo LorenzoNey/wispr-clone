@@ -2,15 +2,39 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
+using Avalonia.Threading;
 using WisprClone.Services.Interfaces;
+#if WINDOWS
+using System.Runtime.InteropServices;
+#endif
 
 namespace WisprClone.Services;
 
 /// <summary>
 /// Cross-platform clipboard service using Avalonia's clipboard API.
+/// Falls back to native Windows API when Avalonia clipboard is unavailable.
 /// </summary>
 public class AvaloniaClipboardService : IClipboardService
 {
+#if WINDOWS
+    [DllImport("user32.dll")]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll")]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetClipboardData(uint uFormat);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    private const uint CF_UNICODETEXT = 13;
+#endif
+
     private IClipboard? GetClipboard()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -63,19 +87,68 @@ public class AvaloniaClipboardService : IClipboardService
     /// <inheritdoc />
     public async Task<string> GetTextAsync()
     {
+        // First try Avalonia clipboard
         var clipboard = GetClipboard();
         if (clipboard != null)
         {
             try
             {
-                return await clipboard.GetTextAsync() ?? string.Empty;
+                var text = await clipboard.GetTextAsync();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    return text;
+                }
             }
             catch
             {
-                return string.Empty;
+                // Fall through to native API
             }
         }
 
+#if WINDOWS
+        // Fallback to native Windows clipboard API
+        return await Task.Run(() => GetClipboardTextNative());
+#else
         return string.Empty;
+#endif
     }
+
+#if WINDOWS
+    private string GetClipboardTextNative()
+    {
+        try
+        {
+            if (!OpenClipboard(IntPtr.Zero))
+                return string.Empty;
+
+            try
+            {
+                IntPtr handle = GetClipboardData(CF_UNICODETEXT);
+                if (handle == IntPtr.Zero)
+                    return string.Empty;
+
+                IntPtr pointer = GlobalLock(handle);
+                if (pointer == IntPtr.Zero)
+                    return string.Empty;
+
+                try
+                {
+                    return Marshal.PtrToStringUni(pointer) ?? string.Empty;
+                }
+                finally
+                {
+                    GlobalUnlock(handle);
+                }
+            }
+            finally
+            {
+                CloseClipboard();
+            }
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+#endif
 }

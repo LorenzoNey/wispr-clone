@@ -13,6 +13,7 @@ using WisprClone.Models;
 using WisprClone.Services;
 using WisprClone.Services.Interfaces;
 using WisprClone.Services.Speech;
+using WisprClone.Services.Tts;
 using WisprClone.ViewModels;
 using WisprClone.Views;
 
@@ -187,21 +188,28 @@ public partial class App : Application
     {
         try
         {
-            if (_overlayWindow != null)
+            // Ensure overlay window exists
+            if (_overlayWindow == null)
             {
-                _overlayWindow.Show();
+                Log("Creating overlay window on demand");
+                _overlayWindow = new OverlayWindow
+                {
+                    DataContext = _mainViewModel.OverlayViewModel
+                };
+            }
 
-                if (activate)
-                {
-                    _overlayWindow.Activate();
-                }
-                else
-                {
-                    // Bring to foreground without stealing focus by toggling Topmost
-                    // This forces Windows to re-evaluate the Z-order
-                    _overlayWindow.Topmost = false;
-                    _overlayWindow.Topmost = true;
-                }
+            _overlayWindow.Show();
+
+            if (activate)
+            {
+                _overlayWindow.Activate();
+            }
+            else
+            {
+                // Bring to foreground without stealing focus by toggling Topmost
+                // This forces Windows to re-evaluate the Z-order
+                _overlayWindow.Topmost = false;
+                _overlayWindow.Topmost = true;
             }
         }
         catch (Exception ex)
@@ -315,6 +323,23 @@ public partial class App : Application
                 sp.GetRequiredService<HybridSpeechRecognitionService>(),
                 settings);
         });
+
+        // Windows TTS services
+        services.AddSingleton<OfflineTextToSpeechService>();
+        services.AddSingleton<AzureTextToSpeechService>();
+        services.AddSingleton<OpenAITextToSpeechService>();
+        services.AddSingleton<ITextToSpeechService>(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsService>();
+            var logging = sp.GetRequiredService<ILoggingService>();
+            logging.Log("App", $"Initial TTS provider: {settings.Current.TtsProvider}");
+
+            return new TtsServiceManager(
+                sp.GetRequiredService<OfflineTextToSpeechService>(),
+                sp.GetRequiredService<AzureTextToSpeechService>(),
+                sp.GetRequiredService<OpenAITextToSpeechService>(),
+                settings);
+        });
 #else
         // macOS/Linux: Cloud providers + native macOS speech
         services.AddSingleton<MacOSSpeechRecognitionService>();
@@ -337,6 +362,16 @@ public partial class App : Application
                 macOSService,
                 settings,
                 logging);
+        });
+
+        // macOS/Linux TTS services (cross-platform manager)
+        services.AddSingleton<ITextToSpeechService>(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsService>();
+            var logging = sp.GetRequiredService<ILoggingService>();
+            logging.Log("App", $"Initial TTS provider (non-Windows): {settings.Current.TtsProvider}");
+
+            return new CrossPlatformTtsServiceManager(settings, logging);
         });
 #endif
 

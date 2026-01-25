@@ -15,8 +15,9 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
-  <!-- Define WINDOWS constant for conditional compilation based on target RID -->
-  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+  <!-- Define WINDOWS constant for conditional compilation -->
+  <!-- Check both RuntimeIdentifier (for publish) and current OS (for debug/run) -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('win')) OR $([MSBuild]::IsOSPlatform('Windows'))">
     <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
 
@@ -44,7 +45,7 @@
   </ItemGroup>
 
   <!-- Platform-specific dependencies (Windows only) -->
-  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win')) OR $([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
   </ItemGroup>

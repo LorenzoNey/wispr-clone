@@ -158,21 +158,18 @@
             <TabItem Header="General">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
                     <StackPanel Margin="2,0,2,0">
-                        <!-- Speech Provider Card -->
+                        <!-- Speech-to-Text Provider Card -->
                         <Border Classes="card">
                             <StackPanel>
-                                <TextBlock Text="Speech Provider" Classes="cardTitle"/>
+                                <TextBlock Text="Speech-to-Text (STT)" Classes="cardTitle"/>
 
-                                <TextBlock Text="Select Provider" Classes="label"/>
+                                <TextBlock Text="Select STT Provider" Classes="label"/>
                                 <ComboBox x:Name="SpeechProviderComboBox"
                                           Classes="settings"
                                           Width="250"
                                           HorizontalAlignment="Left"
                                           SelectionChanged="SpeechProviderComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Local (Windows Speech)" Tag="Offline" IsSelected="True"/>
-                                    <ComboBoxItem Content="Local (macOS Speech)" Tag="MacOSNative"/>
-                                    <ComboBoxItem Content="Azure Speech" Tag="Azure"/>
-                                    <ComboBoxItem Content="OpenAI Whisper" Tag="OpenAI"/>
+                                    <!-- Items populated dynamically based on platform -->
                                 </ComboBox>
 
                                 <TextBlock x:Name="ProviderInfoText"
@@ -221,6 +218,107 @@
                                     </StackPanel>
 
                                     <TextBlock Text="Used for Whisper batch API. Re-transcribes entire audio every 2s."
+                                               Classes="info"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Text-to-Speech Provider Card -->
+                        <Border Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="Text-to-Speech (TTS)" Classes="cardTitle"/>
+
+                                <TextBlock Text="Select TTS Provider" Classes="label"/>
+                                <ComboBox x:Name="TtsProviderComboBox"
+                                          Classes="settings"
+                                          Width="250"
+                                          HorizontalAlignment="Left"
+                                          SelectionChanged="TtsProviderComboBox_SelectionChanged">
+                                    <!-- Items populated dynamically based on platform -->
+                                </ComboBox>
+
+                                <TextBlock x:Name="TtsProviderInfoText"
+                                           Text="Shift+Shift to read clipboard text aloud."
+                                           Classes="info"/>
+
+                                <!-- TTS Voice Settings -->
+                                <StackPanel x:Name="TtsVoiceSettingsPanel" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <StackPanel Classes="inputRow" Margin="0">
+                                        <TextBlock Text="Speech Rate" Classes="inlineLabel" Width="100"/>
+                                        <Slider x:Name="TtsRateSlider"
+                                                Width="150"
+                                                Minimum="0.5"
+                                                Maximum="2.0"
+                                                Value="1.0"
+                                                TickFrequency="0.1"
+                                                IsSnapToTickEnabled="True"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TtsRateValueText"
+                                                   Text="1.0x"
+                                                   Classes="inlineLabel"
+                                                   Width="40"
+                                                   Margin="8,0,0,0"/>
+                                    </StackPanel>
+
+                                    <StackPanel Classes="inputRow">
+                                        <TextBlock Text="Volume" Classes="inlineLabel" Width="100"/>
+                                        <Slider x:Name="TtsVolumeSlider"
+                                                Width="150"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Value="100"
+                                                TickFrequency="10"
+                                                IsSnapToTickEnabled="True"
+                                                VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TtsVolumeValueText"
+                                                   Text="100%"
+                                                   Classes="inlineLabel"
+                                                   Width="40"
+                                                   Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- OpenAI TTS Settings Panel (conditional) -->
+                                <StackPanel x:Name="OpenAITtsSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="OpenAI TTS Voice" Classes="label"/>
+                                    <ComboBox x:Name="OpenAITtsVoiceComboBox" Classes="settings" Width="180" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="Alloy" Tag="alloy" IsSelected="True"/>
+                                        <ComboBoxItem Content="Echo" Tag="echo"/>
+                                        <ComboBoxItem Content="Fable" Tag="fable"/>
+                                        <ComboBoxItem Content="Onyx" Tag="onyx"/>
+                                        <ComboBoxItem Content="Nova" Tag="nova"/>
+                                        <ComboBoxItem Content="Shimmer" Tag="shimmer"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Model" Classes="label" Margin="0,12,0,6"/>
+                                    <ComboBox x:Name="OpenAITtsModelComboBox" Classes="settings" Width="180" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="TTS-1 (Standard)" Tag="tts-1" IsSelected="True"/>
+                                        <ComboBoxItem Content="TTS-1-HD (High Quality)" Tag="tts-1-hd"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Uses same API key as OpenAI Whisper (above)."
+                                               Classes="info"/>
+                                </StackPanel>
+
+                                <!-- Azure TTS Settings Panel (conditional) -->
+                                <StackPanel x:Name="AzureTtsSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <TextBlock Text="Azure TTS Voice" Classes="label"/>
+                                    <ComboBox x:Name="AzureTtsVoiceComboBox" Classes="settings" Width="250" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="Jenny (US)" Tag="en-US-JennyNeural" IsSelected="True"/>
+                                        <ComboBoxItem Content="Guy (US)" Tag="en-US-GuyNeural"/>
+                                        <ComboBoxItem Content="Aria (US)" Tag="en-US-AriaNeural"/>
+                                        <ComboBoxItem Content="Davis (US)" Tag="en-US-DavisNeural"/>
+                                        <ComboBoxItem Content="Sonia (UK)" Tag="en-GB-SoniaNeural"/>
+                                        <ComboBoxItem Content="Ryan (UK)" Tag="en-GB-RyanNeural"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Uses same Azure credentials as Speech Recognition (above)."
                                                Classes="info"/>
                                 </StackPanel>
                             </StackPanel>
