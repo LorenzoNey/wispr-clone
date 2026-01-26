@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using SharpCompress.Archives;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Common;
@@ -13,23 +14,132 @@ namespace WisprClone.Services;
 
 /// <summary>
 /// Helper for downloading and extracting external tools like faster-whisper and piper.
+/// Supports Windows, macOS, and Linux platforms.
 /// </summary>
 public class DownloadHelper
 {
     private readonly HttpClient _httpClient;
     private readonly ILoggingService? _loggingService;
 
-    // Download URLs - verified working releases
-    public const string FasterWhisperUrl = "https://github.com/Purfview/whisper-standalone-win/releases/download/Faster-Whisper-XXL/Faster-Whisper-XXL_r245.4_windows.7z";
-    public const string PiperUrl = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip";
+    #region Platform-specific Download URLs
 
-    // whisper.cpp server - CUDA 12.4 build for Windows (from ggml-org repo)
-    public const string WhisperServerUrl = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.3/whisper-cublas-12.4.0-bin-x64.zip";
-    // Default ggml model (base.en - small and fast for English)
+    // whisper.cpp server URLs by platform (v1.8.3)
+    // Windows: CUDA 12.4 build for GPU acceleration
+    // macOS: Metal build for GPU acceleration
+    // Linux: CPU build (CUDA builds require specific CUDA versions)
+    private const string WhisperServerUrl_Windows = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.3/whisper-cublas-12.4.0-bin-x64.zip";
+    private const string WhisperServerUrl_MacOS_Arm64 = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.3/whisper-bin-arm64.zip";
+    private const string WhisperServerUrl_MacOS_x64 = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.3/whisper-bin-x64.zip";
+    private const string WhisperServerUrl_Linux = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.3/whisper-bin-x64.zip";
+
+    // Piper TTS URLs by platform (2023.11.14-2)
+    private const string PiperUrl_Windows = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip";
+    private const string PiperUrl_MacOS_Arm64 = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_aarch64.tar.gz";
+    private const string PiperUrl_MacOS_x64 = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_x64.tar.gz";
+    private const string PiperUrl_Linux = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz";
+
+    // Faster-Whisper-XXL is Windows-only (uses Windows-specific dependencies)
+    private const string FasterWhisperUrl_Windows = "https://github.com/Purfview/whisper-standalone-win/releases/download/Faster-Whisper-XXL/Faster-Whisper-XXL_r245.4_windows.7z";
+
+    // Default ggml model (base.en - small and fast for English) - cross-platform
     public const string WhisperServerModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 
-    // 7-Zip standalone for extracting .7z files (SharpCompress has limited support)
+    // Default Piper voice (en_US-amy-medium) - cross-platform
+    public const string DefaultPiperVoiceUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx";
+    public const string DefaultPiperVoiceConfigUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json";
+
+    // 7-Zip standalone for extracting .7z files (Windows only - macOS/Linux use tar)
     public const string SevenZipUrl = "https://www.7-zip.org/a/7zr.exe";
+
+    #endregion
+
+    #region Platform Detection Helpers
+
+    /// <summary>
+    /// Gets the current operating system platform.
+    /// </summary>
+    public static OSPlatform CurrentPlatform
+    {
+        get
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return OSPlatform.Windows;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return OSPlatform.OSX;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return OSPlatform.Linux;
+            return OSPlatform.Windows; // Default fallback
+        }
+    }
+
+    /// <summary>
+    /// Checks if we're running on Apple Silicon (ARM64 Mac).
+    /// </summary>
+    public static bool IsAppleSilicon => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+        && RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+
+    /// <summary>
+    /// Gets the whisper server download URL for the current platform.
+    /// </summary>
+    public static string GetWhisperServerUrl()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return WhisperServerUrl_Windows;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return IsAppleSilicon ? WhisperServerUrl_MacOS_Arm64 : WhisperServerUrl_MacOS_x64;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return WhisperServerUrl_Linux;
+        return WhisperServerUrl_Windows;
+    }
+
+    /// <summary>
+    /// Gets the Piper TTS download URL for the current platform.
+    /// </summary>
+    public static string GetPiperUrl()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return PiperUrl_Windows;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return IsAppleSilicon ? PiperUrl_MacOS_Arm64 : PiperUrl_MacOS_x64;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return PiperUrl_Linux;
+        return PiperUrl_Windows;
+    }
+
+    /// <summary>
+    /// Gets the Faster-Whisper-XXL download URL. Only available on Windows.
+    /// </summary>
+    public static string? GetFasterWhisperUrl()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return FasterWhisperUrl_Windows;
+        return null; // Not available on macOS/Linux
+    }
+
+    /// <summary>
+    /// Gets the whisper server executable name for the current platform.
+    /// </summary>
+    public static string GetWhisperServerExecutableName()
+    {
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "whisper-server.exe" : "whisper-server";
+    }
+
+    /// <summary>
+    /// Gets the Piper executable name for the current platform.
+    /// </summary>
+    public static string GetPiperExecutableName()
+    {
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "piper.exe" : "piper";
+    }
+
+    /// <summary>
+    /// Checks if Faster-Whisper-XXL is available on the current platform.
+    /// </summary>
+    public static bool IsFasterWhisperAvailable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+    #endregion
+
+    // Legacy properties for backwards compatibility
+    public static string FasterWhisperUrl => GetFasterWhisperUrl() ?? "";
+    public static string PiperUrl => GetPiperUrl();
+    public static string WhisperServerUrl => GetWhisperServerUrl();
 
     public DownloadHelper(ILoggingService? loggingService = null)
     {
@@ -160,26 +270,33 @@ public class DownloadHelper
     }
 
     /// <summary>
-    /// Downloads piper to the app directory (without voice files).
+    /// Downloads piper to the app directory with the default voice (en_US-amy-medium).
+    /// Supports Windows, macOS, and Linux platforms.
     /// </summary>
     public async Task DownloadPiperAsync(IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
         var appDir = AppDomain.CurrentDomain.BaseDirectory;
         var targetDir = Path.Combine(appDir, "piper");
         var voicesDir = Path.Combine(targetDir, "voices");
-        var tempFile = Path.Combine(Path.GetTempPath(), $"piper-{Guid.NewGuid():N}.zip");
+        var piperExeName = GetPiperExecutableName();
+        var exePath = Path.Combine(targetDir, piperExeName);
+
+        var downloadUrl = GetPiperUrl();
+        var isTarGz = downloadUrl.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+        var extension = isTarGz ? ".tar.gz" : ".zip";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"piper-{Guid.NewGuid():N}{extension}");
 
         try
         {
             progress?.Report((0, "Downloading Piper TTS (~22 MB)..."));
-            Log("Starting Piper download from: " + PiperUrl);
+            Log($"Starting Piper download from: {downloadUrl}");
 
-            await DownloadFileAsync(PiperUrl, tempFile, new Progress<(double, string)>(p =>
+            await DownloadFileAsync(downloadUrl, tempFile, new Progress<(double, string)>(p =>
             {
-                progress?.Report((p.Item1 * 0.8, p.Item2)); // 0-80% for download
+                progress?.Report((p.Item1 * 0.25, p.Item2)); // 0-25% for exe download
             }), ct);
 
-            progress?.Report((80, "Extracting..."));
+            progress?.Report((25, "Extracting..."));
             Log("Extracting Piper to: " + targetDir);
 
             // Create target directory
@@ -204,27 +321,46 @@ public class DownloadHelper
                 Directory.CreateDirectory(voicesDir);
             }
 
-            // Extract using ZipFile (standard .zip)
-            ZipFile.ExtractToDirectory(tempFile, targetDir);
+            // Extract based on archive type
+            if (isTarGz)
+            {
+                await ExtractTarGzAsync(tempFile, targetDir, ct);
+            }
+            else
+            {
+                ZipFile.ExtractToDirectory(tempFile, targetDir);
+            }
 
             // Flatten if needed
             FlattenDirectoryIfNeeded(targetDir, excludeDir: "voices");
 
-            // Verify piper.exe exists
-            var exePath = Path.Combine(targetDir, "piper.exe");
+            // Verify piper executable exists (platform-specific name)
             if (!File.Exists(exePath))
             {
-                var foundExe = Directory.GetFiles(targetDir, "piper.exe", SearchOption.AllDirectories).FirstOrDefault();
+                var foundExe = Directory.GetFiles(targetDir, piperExeName, SearchOption.AllDirectories).FirstOrDefault();
+
+                // Also try without extension on Unix platforms
+                if (foundExe == null && !RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    foundExe = Directory.GetFiles(targetDir, "piper", SearchOption.AllDirectories).FirstOrDefault();
+                }
+
                 if (foundExe != null)
                 {
-                    Log($"Found piper.exe in subdirectory: {foundExe}");
+                    Log($"Found {piperExeName} in subdirectory: {foundExe}");
                     var subDir = Path.GetDirectoryName(foundExe)!;
                     MoveContentsUp(subDir, targetDir);
                 }
                 else
                 {
-                    throw new FileNotFoundException("piper.exe not found after extraction");
+                    throw new FileNotFoundException($"{piperExeName} not found after extraction");
                 }
+            }
+
+            // On macOS/Linux, make the binary executable
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && File.Exists(exePath))
+            {
+                await MakeExecutableAsync(exePath);
             }
 
             // Ensure voices directory exists
@@ -233,8 +369,26 @@ public class DownloadHelper
                 Directory.CreateDirectory(voicesDir);
             }
 
-            progress?.Report((100, "Done! Now download a voice."));
-            Log("Piper download complete");
+            // Download default voice (en_US-amy-medium)
+            var defaultVoicePath = Path.Combine(voicesDir, "en_US-amy-medium.onnx");
+            var defaultVoiceConfigPath = Path.Combine(voicesDir, "en_US-amy-medium.onnx.json");
+
+            if (!File.Exists(defaultVoicePath))
+            {
+                progress?.Report((30, "Downloading default voice (~65 MB)..."));
+                Log("Downloading default Piper voice: en_US-amy-medium");
+
+                await DownloadFileAsync(DefaultPiperVoiceUrl, defaultVoicePath, new Progress<(double, string)>(p =>
+                {
+                    progress?.Report((30 + p.Item1 * 0.68, p.Item2)); // 30-98% for voice download
+                }), ct);
+
+                progress?.Report((98, "Downloading voice config..."));
+                await DownloadFileAsync(DefaultPiperVoiceConfigUrl, defaultVoiceConfigPath, null, ct);
+            }
+
+            progress?.Report((100, "Done!"));
+            Log("Piper download complete (with default voice)");
         }
         finally
         {
@@ -284,7 +438,8 @@ public class DownloadHelper
     }
 
     /// <summary>
-    /// Downloads whisper.cpp server (with CUDA support) and a default model.
+    /// Downloads whisper.cpp server and a default model.
+    /// Uses platform-specific binaries (CUDA on Windows, Metal on macOS, CPU on Linux).
     /// Skips downloading components that already exist.
     /// </summary>
     public async Task DownloadWhisperServerAsync(IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
@@ -292,7 +447,8 @@ public class DownloadHelper
         var appDir = AppDomain.CurrentDomain.BaseDirectory;
         var targetDir = Path.Combine(appDir, "whisper-server");
         var modelsDir = Path.Combine(targetDir, "models");
-        var serverExePath = Path.Combine(targetDir, "whisper-server.exe");
+        var serverExeName = GetWhisperServerExecutableName();
+        var serverExePath = Path.Combine(targetDir, serverExeName);
         var modelPath = Path.Combine(modelsDir, "ggml-base.en.bin");
 
         var needsServer = !File.Exists(serverExePath);
@@ -307,7 +463,13 @@ public class DownloadHelper
         Directory.CreateDirectory(targetDir);
         Directory.CreateDirectory(modelsDir);
 
-        var tempFile = Path.Combine(Path.GetTempPath(), $"whisper-server-{Guid.NewGuid():N}.zip");
+        var downloadUrl = GetWhisperServerUrl();
+        var isTarGz = downloadUrl.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+        var extension = isTarGz ? ".tar.gz" : ".zip";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"whisper-server-{Guid.NewGuid():N}{extension}");
+
+        // Determine download size based on platform
+        var downloadSize = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "~460 MB" : "~15 MB";
 
         try
         {
@@ -316,10 +478,10 @@ public class DownloadHelper
             // Download server if needed
             if (needsServer)
             {
-                progress?.Report((0, "Downloading whisper.cpp server (~460 MB)..."));
-                Log("Starting whisper.cpp server download from: " + WhisperServerUrl);
+                progress?.Report((0, $"Downloading whisper.cpp server ({downloadSize})..."));
+                Log($"Starting whisper.cpp server download from: {downloadUrl}");
 
-                await DownloadFileAsync(WhisperServerUrl, tempFile, new Progress<(double, string)>(p =>
+                await DownloadFileAsync(downloadUrl, tempFile, new Progress<(double, string)>(p =>
                 {
                     progress?.Report((p.Item1 * 0.5, p.Item2)); // 0-50% for server download
                 }), ct);
@@ -327,14 +489,27 @@ public class DownloadHelper
                 progress?.Report((50, "Extracting server..."));
                 Log("Extracting whisper.cpp server to: " + targetDir);
 
-                // Extract using ZipFile (standard .zip)
-                ZipFile.ExtractToDirectory(tempFile, targetDir, overwriteFiles: true);
+                // Extract based on archive type
+                if (isTarGz)
+                {
+                    await ExtractTarGzAsync(tempFile, targetDir, ct);
+                }
+                else
+                {
+                    ZipFile.ExtractToDirectory(tempFile, targetDir, overwriteFiles: true);
+                }
 
                 // Flatten if needed
                 FlattenDirectoryIfNeeded(targetDir, excludeDir: "models");
 
-                // Find the whisper-server executable
-                var serverExe = Directory.GetFiles(targetDir, "whisper-server.exe", SearchOption.AllDirectories).FirstOrDefault();
+                // Find the whisper-server executable (platform-specific name)
+                var serverExe = Directory.GetFiles(targetDir, serverExeName, SearchOption.AllDirectories).FirstOrDefault();
+
+                // Also try without extension on Unix platforms
+                if (serverExe == null && !RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    serverExe = Directory.GetFiles(targetDir, "whisper-server", SearchOption.AllDirectories).FirstOrDefault();
+                }
 
                 if (serverExe != null && Path.GetDirectoryName(serverExe) != targetDir)
                 {
@@ -342,12 +517,18 @@ public class DownloadHelper
                     MoveContentsUp(sourceDir, targetDir);
                 }
 
+                // On macOS/Linux, make the binary executable
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && File.Exists(serverExePath))
+                {
+                    await MakeExecutableAsync(serverExePath);
+                }
+
                 // Verify server executable exists
                 if (!File.Exists(serverExePath))
                 {
                     var files = Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories).Take(20);
                     Log($"Extracted files (first 20): {string.Join(", ", files.Select(Path.GetFileName))}");
-                    throw new FileNotFoundException("whisper-server.exe not found after extraction");
+                    throw new FileNotFoundException($"{serverExeName} not found after extraction");
                 }
 
                 progressOffset = 55;
@@ -548,4 +729,84 @@ public class DownloadHelper
         _loggingService?.Log("DownloadHelper", message);
         System.Diagnostics.Debug.WriteLine($"[DownloadHelper] {message}");
     }
+
+    #region Cross-Platform Archive Extraction
+
+    /// <summary>
+    /// Extracts a .tar.gz archive using SharpCompress (cross-platform).
+    /// </summary>
+    private async Task ExtractTarGzAsync(string archivePath, string destinationDir, CancellationToken ct)
+    {
+        Log($"Extracting tar.gz: {archivePath} -> {destinationDir}");
+
+        await Task.Run(() =>
+        {
+            using var stream = File.OpenRead(archivePath);
+            using var reader = ReaderFactory.Open(stream);
+
+            while (reader.MoveToNextEntry())
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (!reader.Entry.IsDirectory)
+                {
+                    var entryPath = Path.Combine(destinationDir, reader.Entry.Key);
+                    var entryDir = Path.GetDirectoryName(entryPath);
+
+                    if (!string.IsNullOrEmpty(entryDir) && !Directory.Exists(entryDir))
+                        Directory.CreateDirectory(entryDir);
+
+                    reader.WriteEntryToDirectory(destinationDir, new ExtractionOptions
+                    {
+                        ExtractFullPath = true,
+                        Overwrite = true
+                    });
+                }
+            }
+        }, ct);
+
+        Log("tar.gz extraction complete");
+    }
+
+    /// <summary>
+    /// Makes a file executable on Unix-like systems (macOS/Linux).
+    /// </summary>
+    private async Task MakeExecutableAsync(string filePath)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return;
+
+        Log($"Making executable: {filePath}");
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "chmod",
+                Arguments = $"+x \"{filePath}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                if (process.ExitCode != 0)
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    Log($"chmod failed: {error}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to make file executable: {ex.Message}");
+            // Not fatal - the file might still work
+        }
+    }
+
+    #endregion
 }

@@ -34,6 +34,21 @@ public class SpeechServiceManager : ISpeechRecognitionService
     public bool IsAvailable => _activeService.IsAvailable;
     public string CurrentLanguage => _currentLanguage;
 
+    /// <summary>
+    /// Gets the actual active provider (may differ from settings if fallback occurred).
+    /// </summary>
+    public SpeechProvider ActiveProvider => GetProviderForService(_activeService);
+
+    private SpeechProvider GetProviderForService(ISpeechRecognitionService service)
+    {
+        if (service == _azureService) return SpeechProvider.Azure;
+        if (service == _whisperService) return SpeechProvider.OpenAI;
+        if (service == _realtimeService) return SpeechProvider.OpenAIRealtime;
+        if (service == _fasterWhisperService) return SpeechProvider.FasterWhisper;
+        if (service == _whisperServerService) return SpeechProvider.WhisperServer;
+        return SpeechProvider.Offline; // Hybrid/Offline
+    }
+
     public SpeechServiceManager(
         OfflineSpeechRecognitionService offlineService,
         AzureSpeechRecognitionService azureService,
@@ -76,7 +91,7 @@ public class SpeechServiceManager : ISpeechRecognitionService
 
     private ISpeechRecognitionService GetServiceForProvider(SpeechProvider provider)
     {
-        return provider switch
+        ISpeechRecognitionService service = provider switch
         {
             SpeechProvider.Azure => _azureService,
             SpeechProvider.OpenAI => _whisperService,
@@ -85,6 +100,14 @@ public class SpeechServiceManager : ISpeechRecognitionService
             SpeechProvider.WhisperServer => _whisperServerService,
             _ => _hybridService // Offline uses Hybrid for fallback support
         };
+
+        // If the selected provider isn't available, fall back to offline/hybrid
+        if (!service.IsAvailable && provider != SpeechProvider.Offline)
+        {
+            return _hybridService;
+        }
+
+        return service;
     }
 
     private async void OnSettingsChanged(object? sender, AppSettings settings)

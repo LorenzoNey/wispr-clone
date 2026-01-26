@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Timers;
 using WisprClone.Core;
@@ -17,6 +18,7 @@ namespace WisprClone.Services.Speech;
 /// Whisper speech recognition using a persistent HTTP server.
 /// Keeps the model loaded in memory for instant transcription (~1 second instead of ~7 seconds).
 /// Uses whisper.cpp server for efficient GPU-accelerated inference.
+/// Supports Windows (NAudio), macOS (MacOSAudioHelper), and Linux.
 /// </summary>
 public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 {
@@ -28,6 +30,12 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     private WaveInEvent? _waveIn;
     private WaveFileWriter? _fullAudioWriter;
 #endif
+
+    // Cross-platform audio capture (macOS/Linux)
+    private Process? _audioHelperProcess;
+    private CancellationTokenSource? _audioHelperCts;
+    private BinaryWriter? _fullAudioWriterBinary;
+
     private MemoryStream? _fullAudioStream;
     private readonly object _audioLock = new();
     private bool _disposed;
@@ -60,11 +68,8 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     public string ProviderName => "Whisper Server";
     public string CurrentLanguage { get; private set; } = "en-US";
 
-#if WINDOWS
+    // Cross-platform: check if the server executable exists
     public bool IsAvailable => File.Exists(GetServerExePath());
-#else
-    public bool IsAvailable => false;
-#endif
 
     public WhisperServerSpeechRecognitionService(ILoggingService loggingService, ISettingsService settingsService)
     {
@@ -78,12 +83,244 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 
     private string GetServerExePath()
     {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
+        // Use platform-specific executable name
+        var exeName = DownloadHelper.GetWhisperServerExecutableName();
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", exeName);
     }
 
     private string GetModelsDirectory()
     {
         return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models");
+    }
+
+    /// <summary>
+    /// Gets the path to the MacOSAudioHelper executable (macOS only).
+    /// </summary>
+    private string? GetAudioHelperPath()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return null; // Use NAudio on Windows
+
+        var appPath = AppDomain.CurrentDomain.BaseDirectory;
+
+        // Try several possible locations
+        var possiblePaths = new[]
+        {
+            Path.Combine(appPath, "MacOSAudioHelper"),
+            Path.Combine(appPath, "..", "Resources", "MacOSAudioHelper"),
+            Path.Combine(appPath, "Resources", "MacOSAudioHelper"),
+            // For development
+            Path.Combine(appPath, "..", "..", "..", "..", "MacOSAudioHelper", "MacOSAudioHelper")
+        };
+
+        foreach (var path in possiblePaths)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (File.Exists(fullPath))
+                return fullPath;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if audio capture is available on the current platform.
+    /// </summary>
+    private bool IsAudioCaptureAvailable()
+    {
+#if WINDOWS
+        return true; // NAudio available
+#else
+        // On macOS/Linux, need the audio helper
+        var helperPath = GetAudioHelperPath();
+        return helperPath != null && File.Exists(helperPath);
+#endif
+    }
+
+    /// <summary>
+    /// Starts the macOS audio helper process and begins reading audio data.
+    /// </summary>
+    private async Task<bool> StartAudioHelperAsync()
+    {
+        var helperPath = GetAudioHelperPath();
+        if (string.IsNullOrEmpty(helperPath) || !File.Exists(helperPath))
+        {
+            Log($"Audio helper not found at: {helperPath}");
+            return false;
+        }
+
+        try
+        {
+            _audioHelperCts = new CancellationTokenSource();
+
+            _audioHelperProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = helperPath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+
+            // Handle messages from stderr (JSON messages)
+            _audioHelperProcess.ErrorDataReceived += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    Log($"[AudioHelper] {e.Data}");
+                    HandleAudioHelperMessage(e.Data);
+                }
+            };
+
+            _audioHelperProcess.Start();
+            _audioHelperProcess.BeginErrorReadLine();
+
+            Log($"Audio helper started with PID: {_audioHelperProcess.Id}");
+
+            // Wait a bit for the helper to initialize
+            await Task.Delay(500);
+
+            // Send start command
+            await _audioHelperProcess.StandardInput.WriteLineAsync("{\"action\":\"start\"}");
+            await _audioHelperProcess.StandardInput.FlushAsync();
+
+            Log("Sent start command to audio helper");
+
+            // Start reading audio data from stdout in background
+            _ = Task.Run(() => ReadAudioDataFromHelperAsync(_audioHelperCts.Token));
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to start audio helper: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Handles JSON messages from the audio helper's stderr.
+    /// </summary>
+    private void HandleAudioHelperMessage(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("type", out var typeProp))
+            {
+                var type = typeProp.GetString();
+                switch (type)
+                {
+                    case "ready":
+                        Log("Audio helper is ready");
+                        break;
+                    case "state":
+                        if (root.TryGetProperty("state", out var stateProp))
+                            Log($"Audio helper state: {stateProp.GetString()}");
+                        break;
+                    case "error":
+                        if (root.TryGetProperty("error", out var errorProp))
+                            Log($"Audio helper error: {errorProp.GetString()}");
+                        break;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON, ignore
+        }
+    }
+
+    /// <summary>
+    /// Reads raw PCM audio data from the audio helper's stdout.
+    /// </summary>
+    private async Task ReadAudioDataFromHelperAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (_audioHelperProcess == null) return;
+
+            var stdout = _audioHelperProcess.StandardOutput.BaseStream;
+            var buffer = new byte[4096];
+
+            while (!ct.IsCancellationRequested && _isRecording)
+            {
+                var bytesRead = await stdout.ReadAsync(buffer, 0, buffer.Length, ct);
+                if (bytesRead == 0) break; // End of stream
+
+                lock (_audioLock)
+                {
+                    if (_fullAudioStream != null && _isRecording)
+                    {
+                        // Write raw PCM data directly (no WAV header needed during recording)
+                        _fullAudioStream.Write(buffer, 0, bytesRead);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when stopping
+        }
+        catch (Exception ex)
+        {
+            Log($"Error reading audio data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Stops the macOS audio helper process.
+    /// </summary>
+    private async Task StopAudioHelperAsync()
+    {
+        if (_audioHelperProcess == null) return;
+
+        try
+        {
+            // Send stop command
+            if (!_audioHelperProcess.HasExited)
+            {
+                try
+                {
+                    await _audioHelperProcess.StandardInput.WriteLineAsync("{\"action\":\"stop\"}");
+                    await _audioHelperProcess.StandardInput.FlushAsync();
+                    await Task.Delay(100);
+
+                    await _audioHelperProcess.StandardInput.WriteLineAsync("{\"action\":\"quit\"}");
+                    await _audioHelperProcess.StandardInput.FlushAsync();
+                }
+                catch { /* Process may have already exited */ }
+
+                // Wait for graceful exit
+                var exited = _audioHelperProcess.WaitForExit(2000);
+                if (!exited)
+                {
+                    Log("Audio helper did not exit gracefully, killing...");
+                    _audioHelperProcess.Kill();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Error stopping audio helper: {ex.Message}");
+        }
+        finally
+        {
+            _audioHelperCts?.Cancel();
+            _audioHelperCts?.Dispose();
+            _audioHelperCts = null;
+
+            _audioHelperProcess?.Dispose();
+            _audioHelperProcess = null;
+
+            Log("Audio helper stopped");
+        }
     }
 
     private string GetModelPath()
@@ -115,7 +352,6 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     /// </summary>
     public async Task EnsureServerRunningAsync()
     {
-#if WINDOWS
         var settings = _settingsService.Current;
         var requestedModel = settings.WhisperCppModel;
         _serverPort = settings.WhisperCppServerPort;
@@ -247,7 +483,6 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 
         // Wait for server to be ready
         await WaitForServerReadyAsync();
-#endif
     }
 
     private async Task WaitForServerReadyAsync()
@@ -409,14 +644,13 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         }
     }
 
-    public Task StartRecognitionAsync(CancellationToken cancellationToken = default)
+    public async Task StartRecognitionAsync(CancellationToken cancellationToken = default)
     {
-#if WINDOWS
         if (!IsAvailable)
             throw new InvalidOperationException("Whisper server not found. Extract to: app/whisper-server/");
 
         if (_isRecording)
-            return Task.CompletedTask;
+            return;
 
         try
         {
@@ -431,11 +665,14 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             lock (_audioLock)
             {
                 _fullAudioStream = new MemoryStream();
+#if WINDOWS
                 _fullAudioWriter = new WaveFileWriter(
                     new IgnoreDisposeStream(_fullAudioStream),
                     new WaveFormat(16000, 16, 1));
+#endif
             }
 
+#if WINDOWS
             _waveIn = new WaveInEvent
             {
                 WaveFormat = new WaveFormat(16000, 16, 1)
@@ -446,6 +683,23 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 
             _waveIn.StartRecording();
             _isRecording = true;
+            Log("Started recording with NAudio (Windows)");
+#else
+            // On macOS/Linux, use the audio helper
+            if (!IsAudioCaptureAvailable())
+            {
+                throw new InvalidOperationException(
+                    "Audio capture not available. Please build MacOSAudioHelper on macOS.");
+            }
+
+            var helperStarted = await StartAudioHelperAsync();
+            if (!helperStarted)
+            {
+                throw new InvalidOperationException("Failed to start audio helper");
+            }
+            _isRecording = true;
+            Log("Started recording with Audio Helper (macOS/Linux)");
+#endif
 
             // Start streaming timer if enabled
             var settings = _settingsService.Current;
@@ -470,16 +724,10 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             UpdateState(RecognitionState.Error);
             throw;
         }
-
-        return Task.CompletedTask;
-#else
-        throw new PlatformNotSupportedException("Whisper Server is not available on this platform yet.");
-#endif
     }
 
     public async Task<string> StopRecognitionAsync()
     {
-#if WINDOWS
         Log("StopRecognitionAsync called");
 
         // Stop streaming timer first
@@ -492,7 +740,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             Log("Streaming timer stopped");
         }
 
-        if (!_isRecording || _waveIn == null)
+        if (!_isRecording)
         {
             Log("Not recording, returning empty");
             return string.Empty;
@@ -503,20 +751,48 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             Log("Updating state to Processing");
             UpdateState(RecognitionState.Processing);
 
-            Log("Stopping audio recording");
+            byte[]? audioData = null;
+
+#if WINDOWS
+            if (_waveIn == null)
+            {
+                Log("WaveIn is null, returning empty");
+                return string.Empty;
+            }
+
+            Log("Stopping audio recording (Windows)");
             _waveIn.StopRecording();
             _isRecording = false;
 
-            byte[]? audioData = null;
             lock (_audioLock)
             {
                 if (_fullAudioWriter != null && _fullAudioStream != null)
                 {
                     _fullAudioWriter.Flush();
                     audioData = _fullAudioStream.ToArray();
-                    Log($"Audio data: {audioData?.Length ?? 0} bytes");
+                    Log($"Audio data (WAV): {audioData?.Length ?? 0} bytes");
                 }
             }
+#else
+            Log("Stopping audio recording (macOS/Linux)");
+            _isRecording = false;
+            await StopAudioHelperAsync();
+
+            lock (_audioLock)
+            {
+                if (_fullAudioStream != null)
+                {
+                    // On non-Windows, we have raw PCM data - convert to WAV
+                    var pcmData = _fullAudioStream.ToArray();
+                    Log($"Audio data (raw PCM): {pcmData?.Length ?? 0} bytes");
+                    if (pcmData != null && pcmData.Length > 0)
+                    {
+                        audioData = CreateWavFromPcmCrossPlatform(pcmData);
+                        Log($"Audio data (WAV): {audioData?.Length ?? 0} bytes");
+                    }
+                }
+            }
+#endif
 
             string transcription = string.Empty;
 
@@ -551,9 +827,6 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         {
             CleanupRecording();
         }
-#else
-        return string.Empty;
-#endif
     }
 
     private async Task<string> TranscribeViaServerAsync(byte[] audioData)
@@ -692,6 +965,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
                 $"Recording error: {e.Exception.Message}", e.Exception));
         }
     }
+#endif
 
     // Track if a streaming transcription is already in progress
     private bool _isStreamingInProgress = false;
@@ -800,9 +1074,12 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     {
         lock (_audioLock)
         {
-            if (_fullAudioStream == null || _fullAudioWriter == null) return (null, null);
+            if (_fullAudioStream == null) return (null, null);
 
+#if WINDOWS
+            if (_fullAudioWriter == null) return (null, null);
             _fullAudioWriter.Flush();
+#endif
 
             var totalBytes = _fullAudioStream.Position;
             if (totalBytes == 0) return (null, null);
@@ -888,9 +1165,12 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     {
         lock (_audioLock)
         {
-            if (_fullAudioStream == null || _fullAudioWriter == null) return (null, null);
+            if (_fullAudioStream == null) return (null, null);
 
+#if WINDOWS
+            if (_fullAudioWriter == null) return (null, null);
             _fullAudioWriter.Flush();
+#endif
 
             // Audio format: 16kHz, 16-bit, mono = 32000 bytes per second
             var bytesPerSecond = 16000 * 2;
@@ -938,13 +1218,64 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     }
 
     /// <summary>
-    /// Creates a WAV file from raw PCM data.
+    /// Creates a WAV file from raw PCM data (Windows, uses NAudio).
     /// </summary>
+#if WINDOWS
     private byte[] CreateWavFromPcm(byte[] pcmData)
     {
         using var ms = new MemoryStream();
         using var writer = new WaveFileWriter(ms, new WaveFormat(16000, 16, 1));
         writer.Write(pcmData, 0, pcmData.Length);
+        writer.Flush();
+        return ms.ToArray();
+    }
+#else
+    private byte[] CreateWavFromPcm(byte[] pcmData)
+    {
+        return CreateWavFromPcmCrossPlatform(pcmData);
+    }
+#endif
+
+    /// <summary>
+    /// Creates a WAV file from raw PCM data (cross-platform, manual header construction).
+    /// Format: 16kHz, 16-bit, mono
+    /// </summary>
+    private byte[] CreateWavFromPcmCrossPlatform(byte[] pcmData)
+    {
+        using var ms = new MemoryStream();
+        using var writer = new BinaryWriter(ms);
+
+        // WAV header constants
+        const int sampleRate = 16000;
+        const int bitsPerSample = 16;
+        const int channels = 1;
+        const int bytesPerSample = bitsPerSample / 8;
+        const int byteRate = sampleRate * channels * bytesPerSample;
+        const int blockAlign = channels * bytesPerSample;
+
+        var dataSize = pcmData.Length;
+        var fileSize = 36 + dataSize; // Total file size minus 8 bytes for RIFF header
+
+        // RIFF header
+        writer.Write(new char[] { 'R', 'I', 'F', 'F' });
+        writer.Write(fileSize);
+        writer.Write(new char[] { 'W', 'A', 'V', 'E' });
+
+        // fmt subchunk
+        writer.Write(new char[] { 'f', 'm', 't', ' ' });
+        writer.Write(16); // Subchunk1Size (16 for PCM)
+        writer.Write((short)1); // AudioFormat (1 = PCM)
+        writer.Write((short)channels);
+        writer.Write(sampleRate);
+        writer.Write(byteRate);
+        writer.Write((short)blockAlign);
+        writer.Write((short)bitsPerSample);
+
+        // data subchunk
+        writer.Write(new char[] { 'd', 'a', 't', 'a' });
+        writer.Write(dataSize);
+        writer.Write(pcmData);
+
         writer.Flush();
         return ms.ToArray();
     }
@@ -1117,7 +1448,6 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         // Sort by timestamp (in case of out-of-order additions)
         _confirmedWords.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
     }
-#endif
 
     private void CleanupRecording()
     {
@@ -1129,6 +1459,18 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             _waveIn.Dispose();
             _waveIn = null;
         }
+#else
+        // Cleanup audio helper on non-Windows
+        _audioHelperCts?.Cancel();
+        _audioHelperCts?.Dispose();
+        _audioHelperCts = null;
+
+        if (_audioHelperProcess != null && !_audioHelperProcess.HasExited)
+        {
+            try { _audioHelperProcess.Kill(); } catch { }
+        }
+        _audioHelperProcess?.Dispose();
+        _audioHelperProcess = null;
 #endif
 
         lock (_audioLock)
@@ -1202,6 +1544,16 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         {
 #if WINDOWS
             _waveIn?.StopRecording();
+#else
+            // Stop audio helper gracefully
+            try
+            {
+                if (_audioHelperProcess != null && !_audioHelperProcess.HasExited)
+                {
+                    _audioHelperProcess.StandardInput.WriteLine("{\"action\":\"quit\"}");
+                }
+            }
+            catch { }
 #endif
             _isRecording = false;
         }

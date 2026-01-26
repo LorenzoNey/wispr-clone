@@ -87,6 +87,10 @@ public partial class App : Application
             DataContext = _mainViewModel.OverlayViewModel
         };
 
+        // Ensure required models are available for offline providers (fire and forget)
+        EnsurePiperModelAvailableAsync();
+        EnsureWhisperServerModelAvailableAsync();
+
         // Warm up speech models if selected (fire and forget)
         WarmupFasterWhisperIfNeeded();
         WarmupWhisperServerIfNeeded();
@@ -375,13 +379,28 @@ public partial class App : Application
         });
 
         // macOS/Linux TTS services (cross-platform manager)
+        services.AddSingleton<AzureTextToSpeechService>();
+        services.AddSingleton<OpenAITextToSpeechService>();
+        services.AddSingleton<MacOSTextToSpeechService>();
         services.AddSingleton<ITextToSpeechService>(sp =>
         {
             var settings = sp.GetRequiredService<ISettingsService>();
             var logging = sp.GetRequiredService<ILoggingService>();
             logging.Log("App", $"Initial TTS provider (non-Windows): {settings.Current.TtsProvider}");
 
-            return new CrossPlatformTtsServiceManager(settings, logging);
+            // macOS native TTS is only available on macOS
+            MacOSTextToSpeechService? macOSTtsService = null;
+            if (OperatingSystem.IsMacOS())
+            {
+                macOSTtsService = sp.GetRequiredService<MacOSTextToSpeechService>();
+            }
+
+            return new CrossPlatformTtsServiceManager(
+                sp.GetRequiredService<AzureTextToSpeechService>(),
+                sp.GetRequiredService<OpenAITextToSpeechService>(),
+                macOSTtsService,
+                settings,
+                logging);
         });
 #endif
 
@@ -696,5 +715,167 @@ public partial class App : Application
     private void Log(string message)
     {
         _loggingService?.Log("App", message);
+    }
+
+    private async void EnsurePiperModelAvailableAsync()
+    {
+        try
+        {
+            var settings = _serviceProvider?.GetService<ISettingsService>();
+            if (settings?.Current.TtsProvider != Core.TtsProvider.Piper)
+                return;
+
+            var piperExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "piper.exe");
+            if (!File.Exists(piperExePath))
+            {
+                Log("Piper TTS not installed, skipping model check");
+                return;
+            }
+
+            // Check if the configured voice file exists
+            var voicePath = settings.Current.PiperVoicePath;
+            if (!Path.IsPathRooted(voicePath))
+            {
+                voicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", voicePath);
+            }
+
+            if (File.Exists(voicePath))
+            {
+                Log($"Piper voice available: {voicePath}");
+                return;
+            }
+
+            Log($"Piper voice not found: {voicePath}. Downloading default voice...");
+
+            // Try to download the default voice
+            var downloadHelper = new DownloadHelper(_loggingService);
+            var voicesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+            Directory.CreateDirectory(voicesDir);
+
+            var defaultVoicePath = Path.Combine(voicesDir, "en_US-amy-medium.onnx");
+            var defaultVoiceConfigPath = Path.Combine(voicesDir, "en_US-amy-medium.onnx.json");
+
+            try
+            {
+                Log("Downloading default Piper voice (en_US-amy-medium)...");
+                await DownloadFileAsync(DownloadHelper.DefaultPiperVoiceUrl, defaultVoicePath);
+                await DownloadFileAsync(DownloadHelper.DefaultPiperVoiceConfigUrl, defaultVoiceConfigPath);
+
+                // Update settings to use the default voice
+                settings.Current.PiperVoicePath = "voices\\en_US-amy-medium.onnx";
+                await settings.SaveAsync();
+
+                Log("Default Piper voice downloaded and settings updated");
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to download default Piper voice: {ex.Message}");
+                // Provider will gracefully fallback to Local in the service manager
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"EnsurePiperModelAvailableAsync error: {ex.Message}");
+        }
+    }
+
+    private async void EnsureWhisperServerModelAvailableAsync()
+    {
+        try
+        {
+            var settings = _serviceProvider?.GetService<ISettingsService>();
+            if (settings?.Current.SpeechProvider != Core.SpeechProvider.WhisperServer)
+                return;
+
+            var serverExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
+            if (!File.Exists(serverExePath))
+            {
+                Log("Whisper Server not installed, skipping model check");
+                return;
+            }
+
+            // Check if the configured model exists
+            var modelName = settings.Current.WhisperCppModel;
+            var modelFileName = $"ggml-{modelName}.bin";
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", modelFileName);
+
+            if (File.Exists(modelPath))
+            {
+                Log($"Whisper Server model available: {modelPath}");
+                return;
+            }
+
+            Log($"Whisper Server model not found: {modelFileName}. Attempting to download...");
+
+            var modelsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models");
+            Directory.CreateDirectory(modelsDir);
+
+            // Try to download the configured model first
+            try
+            {
+                var modelUrl = $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{modelFileName}";
+                Log($"Downloading model: {modelName}...");
+                await DownloadFileAsync(modelUrl, modelPath);
+                Log($"Whisper Server model downloaded: {modelFileName}");
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to download model {modelName}: {ex.Message}");
+
+                // If the configured model failed, try downloading the default (base.en)
+                if (modelName != "base.en")
+                {
+                    var defaultModelPath = Path.Combine(modelsDir, "ggml-base.en.bin");
+                    if (!File.Exists(defaultModelPath))
+                    {
+                        try
+                        {
+                            Log("Downloading default model (base.en)...");
+                            await DownloadFileAsync(DownloadHelper.WhisperServerModelUrl, defaultModelPath);
+
+                            // Update settings to use the default model
+                            settings.Current.WhisperCppModel = "base.en";
+                            await settings.SaveAsync();
+
+                            Log("Default Whisper model downloaded and settings updated");
+                        }
+                        catch (Exception defaultEx)
+                        {
+                            Log($"Failed to download default model: {defaultEx.Message}");
+                            // Provider will gracefully fallback to Local in the service manager
+                        }
+                    }
+                    else
+                    {
+                        // Default model exists, switch to it
+                        settings.Current.WhisperCppModel = "base.en";
+                        await settings.SaveAsync();
+                        Log("Switched to existing default model (base.en)");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"EnsureWhisperServerModelAvailableAsync error: {ex.Message}");
+        }
+    }
+
+    private async Task DownloadFileAsync(string url, string destinationPath)
+    {
+        using var httpClient = new System.Net.Http.HttpClient();
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("WisprClone/1.0");
+        httpClient.Timeout = TimeSpan.FromMinutes(30);
+
+        Log($"Downloading: {url}");
+        using var response = await httpClient.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        await using var contentStream = await response.Content.ReadAsStreamAsync();
+        await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+        await contentStream.CopyToAsync(fileStream);
+
+        Log($"Download complete: {destinationPath}");
     }
 }
