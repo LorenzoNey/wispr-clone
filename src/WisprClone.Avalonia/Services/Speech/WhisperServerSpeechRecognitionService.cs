@@ -83,14 +83,14 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 
     private string GetServerExePath()
     {
-        // Use platform-specific executable name
+        // Use platform-specific executable name, stored in user data directory
         var exeName = DownloadHelper.GetWhisperServerExecutableName();
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", exeName);
+        return Path.Combine(DownloadHelper.GetDataDirectory(), "whisper-server", exeName);
     }
 
     private string GetModelsDirectory()
     {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models");
+        return Path.Combine(DownloadHelper.GetDataDirectory(), "whisper-server", "models");
     }
 
     /// <summary>

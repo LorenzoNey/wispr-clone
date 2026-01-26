@@ -70,7 +70,7 @@ public class FasterWhisperSpeechRecognitionService : ISpeechRecognitionService
 
     private string GetExePath()
     {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "faster-whisper-xxl", "faster-whisper-xxl.exe");
+        return Path.Combine(DownloadHelper.GetDataDirectory(), "faster-whisper-xxl", "faster-whisper-xxl.exe");
     }
 
     public Task InitializeAsync(string language = "en-US")

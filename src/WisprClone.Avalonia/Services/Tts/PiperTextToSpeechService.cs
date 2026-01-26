@@ -51,12 +51,12 @@ public class PiperTextToSpeechService : ITextToSpeechService
 
     private string GetExePath()
     {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "piper.exe");
+        return Path.Combine(DownloadHelper.GetDataDirectory(), "piper", "piper.exe");
     }
 
     private string GetVoicesDirectory()
     {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+        return Path.Combine(DownloadHelper.GetDataDirectory(), "piper", "voices");
     }
 
     private string GetVoicePath()
@@ -67,7 +67,7 @@ public class PiperTextToSpeechService : ITextToSpeechService
         // If it's a relative path, make it absolute
         if (!Path.IsPathRooted(voicePath))
         {
-            voicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", voicePath);
+            voicePath = Path.Combine(DownloadHelper.GetDataDirectory(), "piper", voicePath);
         }
 
         return voicePath;
@@ -359,7 +359,7 @@ public class PiperTextToSpeechService : ITextToSpeechService
                 {
                     var fileName = Path.GetFileNameWithoutExtension(file);
                     var relativePath = Path.GetRelativePath(
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper"),
+                        Path.Combine(DownloadHelper.GetDataDirectory(), "piper"),
                         file);
 
                     // Parse voice name: en_US-amy-medium -> Language: en_US, Name: amy, Quality: medium

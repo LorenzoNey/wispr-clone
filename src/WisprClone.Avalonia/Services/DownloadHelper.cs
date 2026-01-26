@@ -136,6 +136,50 @@ public class DownloadHelper
 
     #endregion
 
+    #region Data Directory (User-Writable)
+
+    /// <summary>
+    /// Gets the user-writable data directory for lazy-loaded modules.
+    /// This avoids permission issues when installed in Program Files.
+    /// - Windows: %APPDATA%\WisprClone
+    /// - macOS: ~/Library/Application Support/WisprClone
+    /// - Linux: ~/.local/share/WisprClone
+    /// </summary>
+    public static string GetDataDirectory()
+    {
+        string baseDir;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            baseDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Application Support");
+        }
+        else // Linux
+        {
+            var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+            baseDir = !string.IsNullOrEmpty(xdgDataHome)
+                ? xdgDataHome
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share");
+        }
+
+        var dataDir = Path.Combine(baseDir, "WisprClone");
+
+        // Ensure directory exists
+        if (!Directory.Exists(dataDir))
+        {
+            Directory.CreateDirectory(dataDir);
+        }
+
+        return dataDir;
+    }
+
+    #endregion
+
     // Legacy properties for backwards compatibility
     public static string FasterWhisperUrl => GetFasterWhisperUrl() ?? "";
     public static string PiperUrl => GetPiperUrl();
@@ -154,7 +198,7 @@ public class DownloadHelper
     /// </summary>
     public async Task DownloadFasterWhisperAsync(IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDir = GetDataDirectory();
         var targetDir = Path.Combine(appDir, "faster-whisper-xxl");
         var tempFile = Path.Combine(Path.GetTempPath(), $"faster-whisper-xxl-{Guid.NewGuid():N}.7z");
         var sevenZipExe = Path.Combine(appDir, "7zr.exe");
@@ -275,7 +319,7 @@ public class DownloadHelper
     /// </summary>
     public async Task DownloadPiperAsync(IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDir = GetDataDirectory();
         var targetDir = Path.Combine(appDir, "piper");
         var voicesDir = Path.Combine(targetDir, "voices");
         var piperExeName = GetPiperExecutableName();
@@ -401,7 +445,7 @@ public class DownloadHelper
     /// </summary>
     public async Task DownloadPiperVoiceAsync(PiperVoiceEntry voice, IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDir = GetDataDirectory();
         var voicesDir = Path.Combine(appDir, "piper", "voices");
 
         if (!Directory.Exists(voicesDir))
@@ -444,7 +488,7 @@ public class DownloadHelper
     /// </summary>
     public async Task DownloadWhisperServerAsync(IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDir = GetDataDirectory();
         var targetDir = Path.Combine(appDir, "whisper-server");
         var modelsDir = Path.Combine(targetDir, "models");
         var serverExeName = GetWhisperServerExecutableName();
@@ -563,7 +607,7 @@ public class DownloadHelper
     /// </summary>
     public async Task DownloadWhisperModelAsync(string modelName, IProgress<(double progress, string status)>? progress = null, CancellationToken ct = default)
     {
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDir = GetDataDirectory();
         var modelsDir = Path.Combine(appDir, "whisper-server", "models");
 
         Directory.CreateDirectory(modelsDir);
@@ -619,7 +663,7 @@ public class DownloadHelper
     public bool IsWhisperModelInstalled(string modelName)
     {
         var modelFileName = $"ggml-{modelName}.bin";
-        var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", modelFileName);
+        var modelPath = Path.Combine(GetDataDirectory(), "whisper-server", "models", modelFileName);
         return File.Exists(modelPath);
     }
 
@@ -636,7 +680,7 @@ public class DownloadHelper
     /// </summary>
     public List<(string key, string path)> GetInstalledPiperVoices()
     {
-        var voicesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+        var voicesDir = Path.Combine(GetDataDirectory(), "piper", "voices");
         var voices = new List<(string key, string path)>();
 
         if (Directory.Exists(voicesDir))
