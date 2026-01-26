@@ -42,6 +42,7 @@
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.42.0" />
     <PackageReference Include="OpenAI" Version="2.8.0" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="SharpCompress" Version="0.37.2" />
   </ItemGroup>
 
   <!-- Platform-specific dependencies (Windows only) -->

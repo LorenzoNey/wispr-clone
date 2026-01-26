@@ -220,6 +220,147 @@
                                     <TextBlock Text="Used for Whisper batch API. Re-transcribes entire audio every 2s."
                                                Classes="info"/>
                                 </StackPanel>
+
+                                <!-- Faster-Whisper Settings Panel (conditional) -->
+                                <StackPanel x:Name="FasterWhisperSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <StackPanel x:Name="FasterWhisperDownloadPanel" Margin="0,0,0,12">
+                                        <TextBlock x:Name="FasterWhisperWarningText"
+                                                   Text="faster-whisper-xxl.exe not found."
+                                                   Foreground="#FFFF6B6B"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button x:Name="DownloadFasterWhisperButton"
+                                                    Content="Download (~1.5 GB)"
+                                                    Classes="primary"
+                                                    Click="DownloadFasterWhisperButton_Click"
+                                                    Padding="12,6"/>
+                                            <TextBlock x:Name="FasterWhisperDownloadStatus"
+                                                       Text=""
+                                                       Foreground="#FF808080"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"/>
+                                        </StackPanel>
+                                        <ProgressBar x:Name="FasterWhisperDownloadProgress"
+                                                     IsVisible="False"
+                                                     Value="0"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Height="4"
+                                                     Margin="0,8,0,0"
+                                                     Background="#FF404040"
+                                                     Foreground="#FF3391FF"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="Model" Classes="label"/>
+                                    <ComboBox x:Name="FasterWhisperModelComboBox" Classes="settings" Width="200" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="tiny" Tag="tiny"/>
+                                        <ComboBoxItem Content="base" Tag="base"/>
+                                        <ComboBoxItem Content="small" Tag="small"/>
+                                        <ComboBoxItem Content="medium" Tag="medium"/>
+                                        <ComboBoxItem Content="large-v3-turbo" Tag="large-v3-turbo" IsSelected="True"/>
+                                        <ComboBoxItem Content="large-v3" Tag="large-v3"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Language" Classes="label" Margin="0,12,0,6"/>
+                                    <ComboBox x:Name="FasterWhisperLanguageComboBox" Classes="settings" Width="200" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="Auto-detect" Tag="auto" IsSelected="True"/>
+                                        <ComboBoxItem Content="English" Tag="en"/>
+                                        <ComboBoxItem Content="Romanian" Tag="ro"/>
+                                        <ComboBoxItem Content="Spanish" Tag="es"/>
+                                        <ComboBoxItem Content="French" Tag="fr"/>
+                                        <ComboBoxItem Content="German" Tag="de"/>
+                                        <ComboBoxItem Content="Italian" Tag="it"/>
+                                        <ComboBoxItem Content="Portuguese" Tag="pt"/>
+                                        <ComboBoxItem Content="Chinese" Tag="zh"/>
+                                        <ComboBoxItem Content="Japanese" Tag="ja"/>
+                                    </ComboBox>
+
+                                    <CheckBox x:Name="FasterWhisperGpuCheckBox"
+                                              Content="Use GPU acceleration (CUDA)"
+                                              Classes="settings"
+                                              IsChecked="True"
+                                              Margin="0,12,0,0"/>
+
+                                    <StackPanel x:Name="FasterWhisperGpuSettingsPanel" Margin="20,8,0,0">
+                                        <StackPanel Classes="inputRow" Margin="0">
+                                            <TextBlock Text="GPU Device ID" Classes="inlineLabel" Width="100"/>
+                                            <TextBox x:Name="FasterWhisperDeviceIdTextBox" Classes="settings" Width="60" Text="0"/>
+                                        </StackPanel>
+
+                                        <TextBlock Text="Compute Type" Classes="label" Margin="0,12,0,6"/>
+                                        <ComboBox x:Name="FasterWhisperComputeTypeComboBox" Classes="settings" Width="150" HorizontalAlignment="Left">
+                                            <ComboBoxItem Content="float16" Tag="float16" IsSelected="True"/>
+                                            <ComboBoxItem Content="float32" Tag="float32"/>
+                                            <ComboBoxItem Content="int8" Tag="int8"/>
+                                            <ComboBoxItem Content="int8_float16" Tag="int8_float16"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <CheckBox x:Name="FasterWhisperDiarizationCheckBox"
+                                              Content="Enable speaker diarization"
+                                              Classes="settings"
+                                              Margin="0,12,0,0"/>
+
+                                    <TextBlock Text="Re-transcribes every 2 seconds for pseudo-streaming. Requires faster-whisper-xxl."
+                                               Classes="info"/>
+                                </StackPanel>
+
+                                <!-- Whisper Server Settings Panel (conditional) -->
+                                <StackPanel x:Name="WhisperServerSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <StackPanel x:Name="WhisperServerDownloadPanel" Margin="0,0,0,12">
+                                        <TextBlock x:Name="WhisperServerWarningText"
+                                                   Text="whisper.cpp server not found."
+                                                   Foreground="#FFFF6B6B"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button x:Name="DownloadWhisperServerButton"
+                                                    Content="Download (~460 MB)"
+                                                    Classes="primary"
+                                                    Click="DownloadWhisperServerButton_Click"
+                                                    Padding="12,6"/>
+                                            <TextBlock x:Name="WhisperServerDownloadStatus"
+                                                       Text=""
+                                                       Foreground="#FF808080"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"/>
+                                        </StackPanel>
+                                        <ProgressBar x:Name="WhisperServerDownloadProgress"
+                                                     IsVisible="False"
+                                                     Value="0"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Height="4"
+                                                     Margin="0,8,0,0"
+                                                     Background="#FF404040"
+                                                     Foreground="#FF3391FF"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="Model" Classes="label"/>
+                                    <ComboBox x:Name="WhisperServerModelComboBox" Classes="settings" Width="200" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="tiny.en (fast)" Tag="tiny.en"/>
+                                        <ComboBoxItem Content="base.en" Tag="base.en" IsSelected="True"/>
+                                        <ComboBoxItem Content="small.en" Tag="small.en"/>
+                                        <ComboBoxItem Content="medium.en" Tag="medium.en"/>
+                                        <ComboBoxItem Content="large-v3" Tag="large-v3"/>
+                                        <ComboBoxItem Content="large-v3-turbo" Tag="large-v3-turbo"/>
+                                    </ComboBox>
+
+                                    <StackPanel Classes="inputRow" Margin="0,12,0,0">
+                                        <TextBlock Text="Server Port" Classes="inlineLabel" Width="100"/>
+                                        <TextBox x:Name="WhisperServerPortTextBox" Classes="settings" Width="80" Text="8178"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="Keeps model loaded in GPU memory for instant (~1 second) transcription. The server starts automatically when needed."
+                                               Classes="info"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -320,6 +461,111 @@
 
                                     <TextBlock Text="Uses same Azure credentials as Speech Recognition (above)."
                                                Classes="info"/>
+                                </StackPanel>
+
+                                <!-- Piper TTS Settings Panel (conditional) -->
+                                <StackPanel x:Name="PiperTtsSettingsPanel" IsVisible="False" Margin="0,16,0,0">
+                                    <Border Height="1" Background="#FF333333" Margin="0,0,0,16"/>
+
+                                    <StackPanel x:Name="PiperDownloadPanel" Margin="0,0,0,12">
+                                        <TextBlock x:Name="PiperTtsWarningText"
+                                                   Text="piper.exe not found."
+                                                   Foreground="#FFFF6B6B"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button x:Name="DownloadPiperButton"
+                                                    Content="Download Piper (~22 MB)"
+                                                    Classes="primary"
+                                                    Click="DownloadPiperButton_Click"
+                                                    Padding="12,6"/>
+                                            <TextBlock x:Name="PiperDownloadStatus"
+                                                       Text=""
+                                                       Foreground="#FF808080"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"/>
+                                        </StackPanel>
+                                        <ProgressBar x:Name="PiperDownloadProgress"
+                                                     IsVisible="False"
+                                                     Value="0"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Height="4"
+                                                     Margin="0,8,0,0"
+                                                     Background="#FF404040"
+                                                     Foreground="#FF3391FF"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="Installed Voice" Classes="label"/>
+                                    <ComboBox x:Name="PiperVoiceComboBox" Classes="settings" Width="280" HorizontalAlignment="Left">
+                                        <!-- Populated dynamically from piper/voices/*.onnx -->
+                                    </ComboBox>
+
+                                    <!-- Voice Browser Section -->
+                                    <Border Height="1" Background="#FF333333" Margin="0,16,0,12"/>
+
+                                    <TextBlock Text="Download More Voices" Classes="label" FontWeight="SemiBold"/>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="Language:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="PiperLanguageFilterComboBox"
+                                                  Classes="settings"
+                                                  Width="150"
+                                                  SelectionChanged="PiperLanguageFilterComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="English" Tag="en" IsSelected="True"/>
+                                            <ComboBoxItem Content="German" Tag="de"/>
+                                            <ComboBoxItem Content="Spanish" Tag="es"/>
+                                            <ComboBoxItem Content="French" Tag="fr"/>
+                                            <ComboBoxItem Content="Italian" Tag="it"/>
+                                            <ComboBoxItem Content="Portuguese" Tag="pt"/>
+                                            <ComboBoxItem Content="Romanian" Tag="ro"/>
+                                            <ComboBoxItem Content="Russian" Tag="ru"/>
+                                            <ComboBoxItem Content="Chinese" Tag="zh"/>
+                                            <ComboBoxItem Content="Japanese" Tag="ja"/>
+                                            <ComboBoxItem Content="All Languages" Tag="all"/>
+                                        </ComboBox>
+                                        <Button x:Name="RefreshVoiceCatalogButton"
+                                                Content="Refresh"
+                                                Classes="secondary"
+                                                Click="RefreshVoiceCatalogButton_Click"
+                                                Padding="8,4"
+                                                Margin="8,0,0,0"/>
+                                    </StackPanel>
+
+                                    <ListBox x:Name="PiperVoiceCatalogList"
+                                             Height="150"
+                                             Margin="0,8,0,0"
+                                             Background="#FF2A2A2A"
+                                             BorderBrush="#FF404040"
+                                             BorderThickness="1"
+                                             SelectionChanged="PiperVoiceCatalogList_SelectionChanged">
+                                        <!-- Populated dynamically from voice catalog -->
+                                    </ListBox>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button x:Name="DownloadSelectedVoiceButton"
+                                                Content="Download Selected Voice"
+                                                Classes="primary"
+                                                Click="DownloadSelectedVoiceButton_Click"
+                                                Padding="12,6"
+                                                IsEnabled="False"/>
+                                        <TextBlock x:Name="VoiceDownloadStatus"
+                                                   Text=""
+                                                   Foreground="#FF808080"
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ProgressBar x:Name="VoiceDownloadProgress"
+                                                 IsVisible="False"
+                                                 Value="0"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Height="4"
+                                                 Margin="0,8,0,0"
+                                                 Background="#FF404040"
+                                                 Foreground="#FF3391FF"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

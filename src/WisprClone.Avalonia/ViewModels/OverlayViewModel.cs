@@ -275,6 +275,7 @@ public partial class OverlayViewModel : ViewModelBase
         if (OperatingSystem.IsWindows())
         {
             providerOptions.Add(new ProviderOption { Provider = SpeechProvider.Offline, DisplayName = "Local (Windows)" });
+            providerOptions.Add(new ProviderOption { Provider = SpeechProvider.FasterWhisper, DisplayName = "Faster-Whisper (Offline)" });
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -283,7 +284,11 @@ public partial class OverlayViewModel : ViewModelBase
 
         // Add cloud providers (available on all platforms)
         providerOptions.Add(new ProviderOption { Provider = SpeechProvider.Azure, DisplayName = "Azure" });
-        providerOptions.Add(new ProviderOption { Provider = SpeechProvider.OpenAI, DisplayName = "OpenAI" });
+        providerOptions.Add(new ProviderOption { Provider = SpeechProvider.OpenAI, DisplayName = "OpenAI Whisper" });
+        if (OperatingSystem.IsWindows())
+        {
+            providerOptions.Add(new ProviderOption { Provider = SpeechProvider.OpenAIRealtime, DisplayName = "OpenAI Realtime" });
+        }
 
         AvailableProviders = providerOptions;
 
@@ -293,6 +298,7 @@ public partial class OverlayViewModel : ViewModelBase
         if (OperatingSystem.IsWindows())
         {
             ttsProviderOptions.Add(new TtsProviderOption { Provider = TtsProvider.Offline, DisplayName = "Local (Windows)" });
+            ttsProviderOptions.Add(new TtsProviderOption { Provider = TtsProvider.Piper, DisplayName = "Piper (Offline)" });
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -384,6 +390,9 @@ public partial class OverlayViewModel : ViewModelBase
             case TtsProvider.Azure:
                 _settingsService.Update(s => s.AzureTtsVoice = value.VoiceId);
                 break;
+            case TtsProvider.Piper:
+                _settingsService.Update(s => s.PiperVoicePath = value.VoiceId);
+                break;
             case TtsProvider.Offline:
             case TtsProvider.MacOSNative:
                 _settingsService.Update(s => s.TtsVoice = value.VoiceId);
@@ -423,6 +432,11 @@ public partial class OverlayViewModel : ViewModelBase
                                    ?? AvailableTtsVoices.First();
                 break;
 
+            case TtsProvider.Piper:
+                // Load installed Piper voices from disk
+                LoadPiperVoices();
+                break;
+
             case TtsProvider.Offline:
             case TtsProvider.MacOSNative:
             default:
@@ -431,6 +445,45 @@ public partial class OverlayViewModel : ViewModelBase
                 SelectedTtsVoice = AvailableTtsVoices.First();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Loads installed Piper voices from the voices directory.
+    /// </summary>
+    private void LoadPiperVoices()
+    {
+        var voicesDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+
+        if (System.IO.Directory.Exists(voicesDir))
+        {
+            var onnxFiles = System.IO.Directory.GetFiles(voicesDir, "*.onnx")
+                .Where(f => !f.EndsWith(".onnx.json"))
+                .ToList();
+
+            foreach (var file in onnxFiles)
+            {
+                var fileName = System.IO.Path.GetFileNameWithoutExtension(file);
+                var relativePath = $"voices/{System.IO.Path.GetFileName(file)}";
+
+                // Parse voice name: en_US-amy-medium -> Language: en_US, Name: amy, Quality: medium
+                var parts = fileName.Split('-');
+                var name = parts.Length > 1 ? parts[1] : fileName;
+                var quality = parts.Length > 2 ? parts[2] : "medium";
+                var displayName = $"{char.ToUpper(name[0])}{name[1..]} ({quality})";
+
+                AvailableTtsVoices.Add(new TtsVoiceOption { VoiceId = relativePath, DisplayName = displayName });
+            }
+        }
+
+        // Add default if no voices found
+        if (AvailableTtsVoices.Count == 0)
+        {
+            AvailableTtsVoices.Add(new TtsVoiceOption { VoiceId = "voices/en_US-amy-medium.onnx", DisplayName = "Amy (medium) - Not Installed" });
+        }
+
+        // Select current voice or first available
+        SelectedTtsVoice = AvailableTtsVoices.FirstOrDefault(v => v.VoiceId == _settingsService.Current.PiperVoicePath)
+                           ?? AvailableTtsVoices.First();
     }
 
     private void OnSettingsChangedExternally(object? sender, Models.AppSettings settings)

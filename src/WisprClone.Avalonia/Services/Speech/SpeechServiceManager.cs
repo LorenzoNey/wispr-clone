@@ -15,6 +15,8 @@ public class SpeechServiceManager : ISpeechRecognitionService
     private readonly OpenAIWhisperSpeechRecognitionService _whisperService;
     private readonly OpenAIRealtimeSpeechRecognitionService _realtimeService;
     private readonly HybridSpeechRecognitionService _hybridService;
+    private readonly FasterWhisperSpeechRecognitionService _fasterWhisperService;
+    private readonly WhisperServerSpeechRecognitionService _whisperServerService;
     private readonly ISettingsService _settingsService;
 
     private ISpeechRecognitionService _activeService;
@@ -38,6 +40,8 @@ public class SpeechServiceManager : ISpeechRecognitionService
         OpenAIWhisperSpeechRecognitionService whisperService,
         OpenAIRealtimeSpeechRecognitionService realtimeService,
         HybridSpeechRecognitionService hybridService,
+        FasterWhisperSpeechRecognitionService fasterWhisperService,
+        WhisperServerSpeechRecognitionService whisperServerService,
         ISettingsService settingsService)
     {
         _offlineService = offlineService;
@@ -45,6 +49,8 @@ public class SpeechServiceManager : ISpeechRecognitionService
         _whisperService = whisperService;
         _realtimeService = realtimeService;
         _hybridService = hybridService;
+        _fasterWhisperService = fasterWhisperService;
+        _whisperServerService = whisperServerService;
         _settingsService = settingsService;
 
         _activeService = GetServiceForProvider(settingsService.Current.SpeechProvider);
@@ -54,6 +60,8 @@ public class SpeechServiceManager : ISpeechRecognitionService
         WireEvents(_whisperService);
         WireEvents(_realtimeService);
         WireEvents(_hybridService);
+        WireEvents(_fasterWhisperService);
+        WireEvents(_whisperServerService);
 
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
@@ -73,6 +81,8 @@ public class SpeechServiceManager : ISpeechRecognitionService
             SpeechProvider.Azure => _azureService,
             SpeechProvider.OpenAI => _whisperService,
             SpeechProvider.OpenAIRealtime => _realtimeService,
+            SpeechProvider.FasterWhisper => _fasterWhisperService,
+            SpeechProvider.WhisperServer => _whisperServerService,
             _ => _hybridService // Offline uses Hybrid for fallback support
         };
     }
@@ -167,6 +177,11 @@ public class SpeechServiceManager : ISpeechRecognitionService
         _azureService.Dispose();
         _whisperService.Dispose();
         _realtimeService.Dispose();
+        _fasterWhisperService.Dispose();
+        _whisperServerService.Dispose();
+
+        // Stop the whisper server process on app shutdown
+        WhisperServerSpeechRecognitionService.StopServer();
     }
 }
 #endif

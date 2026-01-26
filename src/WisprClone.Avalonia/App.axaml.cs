@@ -87,6 +87,10 @@ public partial class App : Application
             DataContext = _mainViewModel.OverlayViewModel
         };
 
+        // Warm up speech models if selected (fire and forget)
+        WarmupFasterWhisperIfNeeded();
+        WarmupWhisperServerIfNeeded();
+
         // Setup system tray
         SetupTrayIcon();
 
@@ -299,8 +303,10 @@ public partial class App : Application
         services.AddSingleton<OpenAIRealtimeSpeechRecognitionService>();
 
 #if WINDOWS
-        // Windows: All providers available including offline
+        // Windows: All providers available including offline, Faster-Whisper, and Whisper Server
         services.AddSingleton<OfflineSpeechRecognitionService>();
+        services.AddSingleton<FasterWhisperSpeechRecognitionService>();
+        services.AddSingleton<WhisperServerSpeechRecognitionService>();
         services.AddSingleton<HybridSpeechRecognitionService>(sp =>
         {
             var settings = sp.GetRequiredService<ISettingsService>();
@@ -321,6 +327,8 @@ public partial class App : Application
                 sp.GetRequiredService<OpenAIWhisperSpeechRecognitionService>(),
                 sp.GetRequiredService<OpenAIRealtimeSpeechRecognitionService>(),
                 sp.GetRequiredService<HybridSpeechRecognitionService>(),
+                sp.GetRequiredService<FasterWhisperSpeechRecognitionService>(),
+                sp.GetRequiredService<WhisperServerSpeechRecognitionService>(),
                 settings);
         });
 
@@ -328,6 +336,7 @@ public partial class App : Application
         services.AddSingleton<OfflineTextToSpeechService>();
         services.AddSingleton<AzureTextToSpeechService>();
         services.AddSingleton<OpenAITextToSpeechService>();
+        services.AddSingleton<PiperTextToSpeechService>();
         services.AddSingleton<ITextToSpeechService>(sp =>
         {
             var settings = sp.GetRequiredService<ISettingsService>();
@@ -338,6 +347,7 @@ public partial class App : Application
                 sp.GetRequiredService<OfflineTextToSpeechService>(),
                 sp.GetRequiredService<AzureTextToSpeechService>(),
                 sp.GetRequiredService<OpenAITextToSpeechService>(),
+                sp.GetRequiredService<PiperTextToSpeechService>(),
                 settings);
         });
 #else
@@ -615,6 +625,72 @@ public partial class App : Application
 
         Log("ForceCleanupAndExit: Exiting process...");
         Environment.Exit(0);
+    }
+
+    private void WarmupFasterWhisperIfNeeded()
+    {
+        try
+        {
+            var settings = _serviceProvider?.GetService<ISettingsService>();
+            if (settings?.Current.SpeechProvider == Core.SpeechProvider.FasterWhisper)
+            {
+                Log("Faster-Whisper selected, warming up model in background...");
+                var fasterWhisperService = _serviceProvider?.GetService<Services.Speech.FasterWhisperSpeechRecognitionService>();
+                if (fasterWhisperService?.IsAvailable == true)
+                {
+                    // Fire and forget - warmup in background
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await fasterWhisperService.WarmupModelAsync();
+                            Log("Faster-Whisper model warmup completed");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Faster-Whisper warmup failed: {ex.Message}");
+                        }
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"WarmupFasterWhisperIfNeeded error: {ex.Message}");
+        }
+    }
+
+    private void WarmupWhisperServerIfNeeded()
+    {
+        try
+        {
+            var settings = _serviceProvider?.GetService<ISettingsService>();
+            if (settings?.Current.SpeechProvider == Core.SpeechProvider.WhisperServer)
+            {
+                Log("WhisperServer selected, starting server in background...");
+                var whisperServerService = _serviceProvider?.GetService<Services.Speech.WhisperServerSpeechRecognitionService>();
+                if (whisperServerService?.IsAvailable == true)
+                {
+                    // Fire and forget - start server in background
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await whisperServerService.EnsureServerRunningAsync();
+                            Log("WhisperServer started and ready");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"WhisperServer startup failed: {ex.Message}");
+                        }
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"WarmupWhisperServerIfNeeded error: {ex.Message}");
+        }
     }
 
     private void Log(string message)

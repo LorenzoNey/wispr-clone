@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using System.IO;
 using WisprClone.Core;
 using WisprClone.Services.Interfaces;
 
@@ -30,6 +31,8 @@ public partial class SettingsWindow : Window
         UpdateApiSettingsPanelVisibility();
         UpdateTtsSettingsPanelVisibility();
         SetupTtsSliderEvents();
+        SetupFasterWhisperEvents();
+        PopulatePiperVoices();
     }
 
     private void LoadSettings()
@@ -94,6 +97,21 @@ public partial class SettingsWindow : Window
         // Azure TTS settings
         SelectComboBoxItemByTag(AzureTtsVoiceComboBox, settings.AzureTtsVoice);
 
+        // Faster-Whisper settings
+        SelectComboBoxItemByTag(FasterWhisperModelComboBox, settings.FasterWhisperModel);
+        SelectComboBoxItemByTag(FasterWhisperLanguageComboBox, settings.FasterWhisperLanguage);
+        FasterWhisperGpuCheckBox.IsChecked = settings.FasterWhisperUseGpu;
+        FasterWhisperDeviceIdTextBox.Text = settings.FasterWhisperDeviceId.ToString();
+        SelectComboBoxItemByTag(FasterWhisperComputeTypeComboBox, settings.FasterWhisperComputeType);
+        FasterWhisperDiarizationCheckBox.IsChecked = settings.FasterWhisperEnableDiarization;
+        UpdateFasterWhisperGpuPanelVisibility();
+
+        // Piper TTS settings
+        SelectPiperVoice(settings.PiperVoicePath);
+
+        // Whisper Server settings
+        SelectComboBoxItemByTag(WhisperServerModelComboBox, settings.WhisperCppModel);
+        WhisperServerPortTextBox.Text = settings.WhisperCppServerPort.ToString();
     }
 
     private void LoadUpdateStatus()
@@ -133,6 +151,8 @@ public partial class SettingsWindow : Window
         if (isWindows)
         {
             SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (Windows Speech)", Tag = "Offline" });
+            SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Faster-Whisper (Offline)", Tag = "FasterWhisper" });
+            SpeechProviderComboBox.Items.Add(new ComboBoxItem { Content = "Whisper Server (Instant)", Tag = "WhisperServer" });
         }
         else if (isMacOS)
         {
@@ -168,6 +188,32 @@ public partial class SettingsWindow : Window
         var selectedTag = GetSelectedComboBoxTag(SpeechProviderComboBox);
         AzureSettingsPanel.IsVisible = selectedTag == "Azure";
         OpenAISettingsPanel.IsVisible = selectedTag == "OpenAI";
+        FasterWhisperSettingsPanel.IsVisible = selectedTag == "FasterWhisper";
+        WhisperServerSettingsPanel.IsVisible = selectedTag == "WhisperServer";
+
+        // Update Faster-Whisper download panel visibility
+        if (selectedTag == "FasterWhisper")
+        {
+            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "faster-whisper-xxl", "faster-whisper-xxl.exe");
+            var exeExists = File.Exists(exePath);
+            FasterWhisperDownloadPanel.IsVisible = !exeExists;
+        }
+
+        // Update Whisper Server download panel visibility
+        if (selectedTag == "WhisperServer")
+        {
+            var serverExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", "ggml-base.en.bin");
+            var serverExists = File.Exists(serverExePath);
+            var modelExists = File.Exists(modelPath);
+            WhisperServerDownloadPanel.IsVisible = !serverExists || !modelExists;
+
+            // Update warning text based on what's missing
+            if (!serverExists)
+                WhisperServerWarningText.Text = "whisper.cpp server not found.";
+            else if (!modelExists)
+                WhisperServerWarningText.Text = "Default model (ggml-base.en.bin) not found.";
+        }
     }
 
     private static void SelectComboBoxItemByTag(ComboBox comboBox, string tag)
@@ -256,6 +302,27 @@ public partial class SettingsWindow : Window
 
             // Azure TTS settings
             settings.AzureTtsVoice = GetSelectedComboBoxTag(AzureTtsVoiceComboBox) ?? "en-US-JennyNeural";
+
+            // Faster-Whisper settings
+            settings.FasterWhisperModel = GetSelectedComboBoxTag(FasterWhisperModelComboBox) ?? "large-v3-turbo";
+            settings.FasterWhisperLanguage = GetSelectedComboBoxTag(FasterWhisperLanguageComboBox) ?? "auto";
+            settings.FasterWhisperUseGpu = FasterWhisperGpuCheckBox.IsChecked ?? true;
+            if (int.TryParse(FasterWhisperDeviceIdTextBox.Text, out var deviceId))
+            {
+                settings.FasterWhisperDeviceId = Math.Max(0, deviceId);
+            }
+            settings.FasterWhisperComputeType = GetSelectedComboBoxTag(FasterWhisperComputeTypeComboBox) ?? "float16";
+            settings.FasterWhisperEnableDiarization = FasterWhisperDiarizationCheckBox.IsChecked ?? false;
+
+            // Piper TTS settings
+            settings.PiperVoicePath = GetSelectedComboBoxTag(PiperVoiceComboBox) ?? "voices/en_US-amy-medium.onnx";
+
+            // Whisper Server settings
+            settings.WhisperCppModel = GetSelectedComboBoxTag(WhisperServerModelComboBox) ?? "base.en";
+            if (int.TryParse(WhisperServerPortTextBox.Text, out var serverPort))
+            {
+                settings.WhisperCppServerPort = Math.Clamp(serverPort, 1024, 65535);
+            }
         });
 
         Close();
@@ -408,6 +475,21 @@ public partial class SettingsWindow : Window
         var selectedTag = GetSelectedComboBoxTag(TtsProviderComboBox);
         OpenAITtsSettingsPanel.IsVisible = selectedTag == "OpenAI";
         AzureTtsSettingsPanel.IsVisible = selectedTag == "Azure";
+        PiperTtsSettingsPanel.IsVisible = selectedTag == "Piper";
+
+        // Update Piper download panel visibility
+        if (selectedTag == "Piper")
+        {
+            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "piper.exe");
+            var exeExists = File.Exists(exePath);
+            PiperDownloadPanel.IsVisible = !exeExists;
+
+            // Refresh voices if piper exists
+            if (exeExists)
+            {
+                PopulatePiperVoices();
+            }
+        }
     }
 
     private void PopulateTtsProviders()
@@ -422,6 +504,7 @@ public partial class SettingsWindow : Window
         if (isWindows)
         {
             TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "Local (Windows Speech)", Tag = "Offline" });
+            TtsProviderComboBox.Items.Add(new ComboBoxItem { Content = "Piper (Offline)", Tag = "Piper" });
         }
         else if (isMacOS)
         {
@@ -482,5 +565,341 @@ public partial class SettingsWindow : Window
                 TtsVolumeValueText.Text = $"{(int)TtsVolumeSlider.Value}%";
             }
         };
+    }
+
+    private void SetupFasterWhisperEvents()
+    {
+        FasterWhisperGpuCheckBox.IsCheckedChanged += (s, e) =>
+        {
+            UpdateFasterWhisperGpuPanelVisibility();
+        };
+    }
+
+    private async void DownloadFasterWhisperButton_Click(object? sender, RoutedEventArgs e)
+    {
+        DownloadFasterWhisperButton.IsEnabled = false;
+        FasterWhisperDownloadProgress.IsVisible = true;
+        FasterWhisperDownloadProgress.Value = 0;
+        FasterWhisperDownloadStatus.Text = "Starting...";
+
+        try
+        {
+            var helper = new global::WisprClone.Services.DownloadHelper();
+            var progress = new Progress<(double progress, string status)>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    FasterWhisperDownloadProgress.Value = p.progress;
+                    FasterWhisperDownloadStatus.Text = p.status;
+                });
+            });
+
+            await helper.DownloadFasterWhisperAsync(progress);
+
+            // Hide download panel on success
+            FasterWhisperDownloadPanel.IsVisible = false;
+            FasterWhisperDownloadStatus.Text = "Downloaded successfully!";
+        }
+        catch (Exception ex)
+        {
+            FasterWhisperDownloadStatus.Text = $"Error: {ex.Message}";
+            FasterWhisperDownloadStatus.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFFF6B6B"));
+            DownloadFasterWhisperButton.IsEnabled = true;
+        }
+        finally
+        {
+            FasterWhisperDownloadProgress.IsVisible = false;
+        }
+    }
+
+    private async void DownloadPiperButton_Click(object? sender, RoutedEventArgs e)
+    {
+        DownloadPiperButton.IsEnabled = false;
+        PiperDownloadProgress.IsVisible = true;
+        PiperDownloadProgress.Value = 0;
+        PiperDownloadStatus.Text = "Starting...";
+
+        try
+        {
+            var helper = new global::WisprClone.Services.DownloadHelper();
+            var progress = new Progress<(double progress, string status)>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    PiperDownloadProgress.Value = p.progress;
+                    PiperDownloadStatus.Text = p.status;
+                });
+            });
+
+            await helper.DownloadPiperAsync(progress);
+
+            // Hide download panel and refresh voices on success
+            PiperDownloadPanel.IsVisible = false;
+            PiperDownloadStatus.Text = "Downloaded successfully!";
+            PopulatePiperVoices();
+        }
+        catch (Exception ex)
+        {
+            PiperDownloadStatus.Text = $"Error: {ex.Message}";
+            PiperDownloadStatus.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFFF6B6B"));
+            DownloadPiperButton.IsEnabled = true;
+        }
+        finally
+        {
+            PiperDownloadProgress.IsVisible = false;
+        }
+    }
+
+    private void UpdateFasterWhisperGpuPanelVisibility()
+    {
+        FasterWhisperGpuSettingsPanel.IsVisible = FasterWhisperGpuCheckBox.IsChecked == true;
+    }
+
+    private async void DownloadWhisperServerButton_Click(object? sender, RoutedEventArgs e)
+    {
+        DownloadWhisperServerButton.IsEnabled = false;
+        WhisperServerDownloadProgress.IsVisible = true;
+        WhisperServerDownloadProgress.Value = 0;
+        WhisperServerDownloadStatus.Text = "Starting...";
+
+        try
+        {
+            var helper = new global::WisprClone.Services.DownloadHelper();
+            var progress = new Progress<(double progress, string status)>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    WhisperServerDownloadProgress.Value = p.progress;
+                    WhisperServerDownloadStatus.Text = p.status;
+                });
+            });
+
+            await helper.DownloadWhisperServerAsync(progress);
+
+            // Hide download panel on success
+            WhisperServerDownloadPanel.IsVisible = false;
+            WhisperServerDownloadStatus.Text = "Downloaded successfully!";
+        }
+        catch (Exception ex)
+        {
+            WhisperServerDownloadStatus.Text = $"Error: {ex.Message}";
+            WhisperServerDownloadStatus.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFFF6B6B"));
+            DownloadWhisperServerButton.IsEnabled = true;
+        }
+        finally
+        {
+            WhisperServerDownloadProgress.IsVisible = false;
+        }
+    }
+
+    private void PopulatePiperVoices()
+    {
+        PiperVoiceComboBox.Items.Clear();
+
+        try
+        {
+            var voicesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+            if (Directory.Exists(voicesDir))
+            {
+                var onnxFiles = Directory.GetFiles(voicesDir, "*.onnx", SearchOption.AllDirectories);
+                foreach (var file in onnxFiles)
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(file);
+                    var relativePath = Path.GetRelativePath(
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper"),
+                        file);
+
+                    // Parse voice name: en_US-amy-medium -> Language: en_US, Name: amy, Quality: medium
+                    var parts = fileName.Split('-');
+                    var name = parts.Length > 1 ? parts[1] : fileName;
+                    var quality = parts.Length > 2 ? parts[2] : "medium";
+                    var displayName = $"{char.ToUpper(name[0])}{name[1..]} ({quality})";
+
+                    PiperVoiceComboBox.Items.Add(new ComboBoxItem
+                    {
+                        Content = displayName,
+                        Tag = relativePath
+                    });
+                }
+            }
+        }
+        catch
+        {
+            // Ignore errors scanning voices directory
+        }
+
+        // Add default voice if no voices found
+        if (PiperVoiceComboBox.Items.Count == 0)
+        {
+            PiperVoiceComboBox.Items.Add(new ComboBoxItem
+            {
+                Content = "Amy (medium) - default",
+                Tag = "voices/en_US-amy-medium.onnx"
+            });
+        }
+
+        // Select first item by default
+        if (PiperVoiceComboBox.Items.Count > 0)
+        {
+            PiperVoiceComboBox.SelectedIndex = 0;
+        }
+    }
+
+    private void SelectPiperVoice(string voicePath)
+    {
+        foreach (var item in PiperVoiceComboBox.Items.Cast<ComboBoxItem>())
+        {
+            if (item.Tag?.ToString() == voicePath)
+            {
+                PiperVoiceComboBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        // If not found, select first item
+        if (PiperVoiceComboBox.Items.Count > 0)
+        {
+            PiperVoiceComboBox.SelectedIndex = 0;
+        }
+    }
+
+    // Piper Voice Catalog
+    private WisprClone.Models.PiperVoiceCatalog? _voiceCatalog;
+    private List<WisprClone.Models.PiperVoiceEntry> _filteredVoices = new();
+
+    private async void RefreshVoiceCatalogButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await LoadVoiceCatalogAsync();
+    }
+
+    private async Task LoadVoiceCatalogAsync()
+    {
+        try
+        {
+            RefreshVoiceCatalogButton.IsEnabled = false;
+            VoiceDownloadStatus.Text = "Loading voice catalog...";
+
+            var helper = new global::WisprClone.Services.DownloadHelper();
+            _voiceCatalog = await helper.GetPiperVoiceCatalogAsync();
+
+            VoiceDownloadStatus.Text = $"Found {_voiceCatalog.Voices.Count} voices";
+            FilterVoiceCatalog();
+        }
+        catch (Exception ex)
+        {
+            VoiceDownloadStatus.Text = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            RefreshVoiceCatalogButton.IsEnabled = true;
+        }
+    }
+
+    private void PiperLanguageFilterComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        FilterVoiceCatalog();
+    }
+
+    private void FilterVoiceCatalog()
+    {
+        if (_voiceCatalog == null) return;
+
+        var languageTag = GetSelectedComboBoxTag(PiperLanguageFilterComboBox);
+        var installedVoices = new global::WisprClone.Services.DownloadHelper().GetInstalledPiperVoices();
+        var installedKeys = installedVoices.Select(v => v.key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (languageTag == "all")
+        {
+            _filteredVoices = _voiceCatalog.Voices.Values
+                .Where(v => !installedKeys.Contains(v.Key)) // Exclude already installed
+                .OrderBy(v => v.Language?.NameEnglish)
+                .ThenBy(v => v.Name)
+                .ThenBy(v => v.Quality)
+                .ToList();
+        }
+        else
+        {
+            _filteredVoices = _voiceCatalog.Voices.Values
+                .Where(v => v.Language?.Family?.Equals(languageTag, StringComparison.OrdinalIgnoreCase) == true)
+                .Where(v => !installedKeys.Contains(v.Key)) // Exclude already installed
+                .OrderBy(v => v.Name)
+                .ThenBy(v => v.Quality)
+                .ToList();
+        }
+
+        PiperVoiceCatalogList.Items.Clear();
+        foreach (var voice in _filteredVoices)
+        {
+            var sizeMb = voice.GetTotalSizeBytes() / (1024.0 * 1024.0);
+            var displayText = languageTag == "all"
+                ? $"{voice.Language?.NameEnglish} - {voice.DisplayName} ({sizeMb:F0} MB)"
+                : $"{voice.DisplayName} ({sizeMb:F0} MB)";
+
+            PiperVoiceCatalogList.Items.Add(new ListBoxItem
+            {
+                Content = displayText,
+                Tag = voice.Key
+            });
+        }
+
+        DownloadSelectedVoiceButton.IsEnabled = false;
+    }
+
+    private void PiperVoiceCatalogList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        DownloadSelectedVoiceButton.IsEnabled = PiperVoiceCatalogList.SelectedItem != null;
+    }
+
+    private async void DownloadSelectedVoiceButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (PiperVoiceCatalogList.SelectedItem is not ListBoxItem selectedItem) return;
+        var voiceKey = selectedItem.Tag?.ToString();
+        if (string.IsNullOrEmpty(voiceKey)) return;
+
+        var voice = _filteredVoices.FirstOrDefault(v => v.Key == voiceKey);
+        if (voice == null) return;
+
+        DownloadSelectedVoiceButton.IsEnabled = false;
+        VoiceDownloadProgress.IsVisible = true;
+        VoiceDownloadProgress.Value = 0;
+        VoiceDownloadStatus.Text = "Starting...";
+
+        try
+        {
+            var helper = new global::WisprClone.Services.DownloadHelper();
+            var progress = new Progress<(double progress, string status)>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    VoiceDownloadProgress.Value = p.progress;
+                    VoiceDownloadStatus.Text = p.status;
+                });
+            });
+
+            await helper.DownloadPiperVoiceAsync(voice, progress);
+
+            VoiceDownloadStatus.Text = "Downloaded! Refreshing...";
+
+            // Refresh installed voices list
+            PopulatePiperVoices();
+
+            // Refresh catalog to remove downloaded voice
+            FilterVoiceCatalog();
+
+            // Select the newly downloaded voice
+            SelectPiperVoice($"voices/{voice.Key}.onnx");
+
+            VoiceDownloadStatus.Text = $"Downloaded {voice.DisplayName}";
+        }
+        catch (Exception ex)
+        {
+            VoiceDownloadStatus.Text = $"Error: {ex.Message}";
+            VoiceDownloadStatus.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFFF6B6B"));
+        }
+        finally
+        {
+            VoiceDownloadProgress.IsVisible = false;
+            DownloadSelectedVoiceButton.IsEnabled = PiperVoiceCatalogList.SelectedItem != null;
+        }
     }
 }

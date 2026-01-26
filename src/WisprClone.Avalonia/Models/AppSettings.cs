@@ -40,6 +40,23 @@ public class AppSettings
     // Azure TTS specific (reuses AzureSubscriptionKey/AzureRegion)
     public string AzureTtsVoice { get; set; } = "en-US-JennyNeural";
 
+    // Faster-Whisper-XXL STT Settings
+    public string FasterWhisperModel { get; set; } = "large-v3-turbo";
+    public string FasterWhisperLanguage { get; set; } = "auto";
+    public bool FasterWhisperUseGpu { get; set; } = true;
+    public int FasterWhisperDeviceId { get; set; } = 0;
+    public string FasterWhisperComputeType { get; set; } = "float16";
+    public bool FasterWhisperEnableDiarization { get; set; } = false;
+    public string FasterWhisperVadMethod { get; set; } = "silero";
+    public bool FasterWhisperUseServer { get; set; } = true; // Use persistent server mode
+
+    // Whisper.cpp Server Settings (for persistent model loading)
+    public string WhisperCppModel { get; set; } = "base.en"; // ggml model name
+    public int WhisperCppServerPort { get; set; } = 8178;
+
+    // Piper TTS Settings
+    public string PiperVoicePath { get; set; } = "voices/en_US-amy-medium.onnx";
+
     // TTS Hotkey Settings (Shift+Shift)
     public int TtsDoubleTapIntervalMs { get; set; } = 400;
     public int TtsMaxKeyHoldDurationMs { get; set; } = 200;

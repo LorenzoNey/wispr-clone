@@ -13,6 +13,7 @@ public class TtsServiceManager : ITextToSpeechService
     private readonly OfflineTextToSpeechService _offlineService;
     private readonly AzureTextToSpeechService _azureService;
     private readonly OpenAITextToSpeechService _openaiService;
+    private readonly PiperTextToSpeechService _piperService;
     private readonly ISettingsService _settingsService;
 
     private ITextToSpeechService _activeService;
@@ -37,11 +38,13 @@ public class TtsServiceManager : ITextToSpeechService
         OfflineTextToSpeechService offlineService,
         AzureTextToSpeechService azureService,
         OpenAITextToSpeechService openaiService,
+        PiperTextToSpeechService piperService,
         ISettingsService settingsService)
     {
         _offlineService = offlineService;
         _azureService = azureService;
         _openaiService = openaiService;
+        _piperService = piperService;
         _settingsService = settingsService;
 
         // Configure cloud services with API keys from settings
@@ -52,6 +55,7 @@ public class TtsServiceManager : ITextToSpeechService
         WireEvents(_offlineService);
         WireEvents(_azureService);
         WireEvents(_openaiService);
+        WireEvents(_piperService);
 
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
@@ -88,6 +92,7 @@ public class TtsServiceManager : ITextToSpeechService
             TtsProvider.Offline => _offlineService,
             TtsProvider.Azure => _azureService,
             TtsProvider.OpenAI => _openaiService,
+            TtsProvider.Piper => _piperService,
             _ => _offlineService // Default to offline
         };
     }
@@ -157,6 +162,7 @@ public class TtsServiceManager : ITextToSpeechService
         {
             TtsProvider.Azure => settings.AzureTtsVoice,
             TtsProvider.OpenAI => settings.OpenAITtsVoice,
+            TtsProvider.Piper => settings.PiperVoicePath,
             _ => settings.TtsVoice
         };
     }
@@ -238,6 +244,7 @@ public class TtsServiceManager : ITextToSpeechService
         _offlineService.Dispose();
         _azureService.Dispose();
         _openaiService.Dispose();
+        _piperService.Dispose();
     }
 }
 #endif

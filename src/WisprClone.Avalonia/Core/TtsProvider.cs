@@ -25,5 +25,11 @@ public enum TtsProvider
     /// Native macOS TTS using AVSpeechSynthesizer.
     /// Only available on macOS.
     /// </summary>
-    MacOSNative
+    MacOSNative,
+
+    /// <summary>
+    /// Offline TTS using piper executable.
+    /// Provides high-quality neural text-to-speech locally.
+    /// </summary>
+    Piper
 }

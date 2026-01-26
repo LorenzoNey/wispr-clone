@@ -31,5 +31,17 @@ public enum SpeechProvider
     /// Native macOS speech recognition using Apple's Speech Framework (SFSpeechRecognizer).
     /// Only available on macOS. Provides on-device recognition with no API costs.
     /// </summary>
-    MacOSNative
+    MacOSNative,
+
+    /// <summary>
+    /// Offline recognition using faster-whisper-xxl executable.
+    /// Provides high-quality local transcription using Whisper models.
+    /// </summary>
+    FasterWhisper,
+
+    /// <summary>
+    /// Offline recognition using whisper.cpp server with model kept in memory.
+    /// Provides instant transcription (~1 second) by keeping the model loaded.
+    /// </summary>
+    WhisperServer
 }
