@@ -70,16 +70,16 @@ public class AppSettings
     public double OverlayLeft { get; set; } = 100;
     public double OverlayTop { get; set; } = 100;
     public double OverlayOpacity { get; set; } = 0.9;
-    public bool StartMinimized { get; set; } = false;
+    public bool StartMinimized { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
 
     // Behavior Settings
     public bool AutoCopyToClipboard { get; set; } = true;
-    public bool AutoPasteAfterCopy { get; set; } = false;
+    public bool AutoPasteAfterCopy { get; set; } = true;
     public int PasteDelayMs { get; set; } = 100;
     public bool PlaySoundOnStart { get; set; } = false;
     public bool PlaySoundOnStop { get; set; } = false;
-    public bool RunOnStartup { get; set; } = false;
+    public bool RunOnStartup { get; set; } = true;
 
     // Recording Limits
     public int MaxRecordingDurationSeconds { get; set; } = 120; // 2 minutes default

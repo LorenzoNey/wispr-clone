@@ -28,6 +28,11 @@ public interface ISettingsService
     void Update(Action<AppSettings> updateAction);
 
     /// <summary>
+    /// Resets all settings to their default values.
+    /// </summary>
+    void ResetToDefaults();
+
+    /// <summary>
     /// Raised when settings are changed.
     /// </summary>
     event EventHandler<AppSettings>? SettingsChanged;

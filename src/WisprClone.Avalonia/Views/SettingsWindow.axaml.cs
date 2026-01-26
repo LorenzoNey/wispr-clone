@@ -10,11 +10,13 @@ namespace WisprClone.Views;
 
 /// <summary>
 /// Settings window for configuring the application (Avalonia version).
+/// Auto-saves on every change.
 /// </summary>
 public partial class SettingsWindow : Window
 {
     private readonly ISettingsService _settingsService;
     private readonly IUpdateService? _updateService;
+    private bool _isLoading = true; // Prevent auto-save during initial load
 
     public SettingsWindow()
     {
@@ -27,14 +29,15 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _settingsService = settingsService;
         _updateService = updateService;
+
         LoadSettings();
         LoadUpdateStatus();
-        UpdateApiSettingsPanelVisibility();
+        UpdateSttSettingsPanelVisibility();
         UpdateTtsSettingsPanelVisibility();
-        SetupTtsSliderEvents();
-        SetupFasterWhisperEvents();
-        SetupWhisperStreamingEvents();
+        SetupAutoSaveEvents();
         PopulatePiperVoices();
+
+        _isLoading = false; // Enable auto-save after initial load
     }
 
     private void LoadSettings()
@@ -74,6 +77,7 @@ public partial class SettingsWindow : Window
         AutoCopyCheckBox.IsChecked = settings.AutoCopyToClipboard;
         AutoPasteCheckBox.IsChecked = settings.AutoPasteAfterCopy;
         StartMinimizedCheckBox.IsChecked = settings.StartMinimized;
+        RunOnStartupCheckBox.IsChecked = settings.RunOnStartup;
 
         // Debugging
         EnableLoggingCheckBox.IsChecked = settings.EnableLogging;
@@ -160,65 +164,83 @@ public partial class SettingsWindow : Window
         ProviderInfoText.Text = Core.ProviderHelper.GetSpeechProviderInfoText();
     }
 
-    private void SpeechProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private void SetupAutoSaveEvents()
     {
-        UpdateApiSettingsPanelVisibility();
-    }
+        // ComboBox selection changes
+        SpeechProviderComboBox.SelectionChanged += (s, e) => { UpdateSttSettingsPanelVisibility(); AutoSave(); };
+        TtsProviderComboBox.SelectionChanged += (s, e) => { UpdateTtsSettingsPanelVisibility(); AutoSave(); };
+        LanguageComboBox.SelectionChanged += (s, e) => AutoSave();
+        FasterWhisperModelComboBox.SelectionChanged += (s, e) => AutoSave();
+        FasterWhisperLanguageComboBox.SelectionChanged += (s, e) => AutoSave();
+        FasterWhisperComputeTypeComboBox.SelectionChanged += (s, e) => AutoSave();
+        WhisperServerModelComboBox.SelectionChanged += (s, e) => { UpdateWhisperServerModelStatus(); AutoSave(); };
+        OpenAITtsVoiceComboBox.SelectionChanged += (s, e) => AutoSave();
+        OpenAITtsModelComboBox.SelectionChanged += (s, e) => AutoSave();
+        AzureTtsVoiceComboBox.SelectionChanged += (s, e) => AutoSave();
+        PiperVoiceComboBox.SelectionChanged += (s, e) => AutoSave();
+        PiperLanguageFilterComboBox.SelectionChanged += (s, e) => FilterVoiceCatalog();
 
-    private void UpdateApiSettingsPanelVisibility()
-    {
-        var selectedTag = GetSelectedComboBoxTag(SpeechProviderComboBox);
-        AzureSettingsPanel.IsVisible = selectedTag == "Azure";
-        OpenAISettingsPanel.IsVisible = selectedTag == "OpenAI";
-        FasterWhisperSettingsPanel.IsVisible = selectedTag == "FasterWhisper";
-        WhisperServerSettingsPanel.IsVisible = selectedTag == "WhisperServer";
+        // CheckBox changes
+        AutoCopyCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        AutoPasteCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        StartMinimizedCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        RunOnStartupCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        AutoCheckUpdatesCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        EnableLoggingCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        UseAzureFallbackCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        FasterWhisperGpuCheckBox.IsCheckedChanged += (s, e) => { UpdateFasterWhisperGpuPanelVisibility(); AutoSave(); };
+        FasterWhisperDiarizationCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        WhisperStreamingEnabledCheckBox.IsCheckedChanged += (s, e) => { UpdateWhisperStreamingPanelVisibility(); AutoSave(); };
 
-        // Update Faster-Whisper download panel visibility
-        if (selectedTag == "FasterWhisper")
+        // TextBox LostFocus for auto-save
+        AzureKeyTextBox.LostFocus += (s, e) => AutoSave();
+        AzureRegionTextBox.LostFocus += (s, e) => AutoSave();
+        OpenAIKeyTextBox.LostFocus += (s, e) => AutoSave();
+        DoubleTapIntervalTextBox.LostFocus += (s, e) => AutoSave();
+        MaxKeyHoldTextBox.LostFocus += (s, e) => AutoSave();
+        MaxRecordingDurationTextBox.LostFocus += (s, e) => AutoSave();
+        FasterWhisperDeviceIdTextBox.LostFocus += (s, e) => AutoSave();
+        WhisperServerPortTextBox.LostFocus += (s, e) => AutoSave();
+
+        // Slider value changes (with display update)
+        TtsRateSlider.PropertyChanged += (s, e) =>
         {
-            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "faster-whisper-xxl", "faster-whisper-xxl.exe");
-            var exeExists = File.Exists(exePath);
-            FasterWhisperDownloadPanel.IsVisible = !exeExists;
-        }
-
-        // Update Whisper Server download panel visibility
-        if (selectedTag == "WhisperServer")
-        {
-            var serverExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", "ggml-base.en.bin");
-            var serverExists = File.Exists(serverExePath);
-            var modelExists = File.Exists(modelPath);
-            WhisperServerDownloadPanel.IsVisible = !serverExists || !modelExists;
-
-            // Update warning text based on what's missing
-            if (!serverExists)
-                WhisperServerWarningText.Text = "whisper.cpp server not found.";
-            else if (!modelExists)
-                WhisperServerWarningText.Text = "Default model (ggml-base.en.bin) not found.";
-        }
-    }
-
-    private static void SelectComboBoxItemByTag(ComboBox comboBox, string tag)
-    {
-        foreach (var item in comboBox.Items.Cast<ComboBoxItem>())
-        {
-            if (item.Tag?.ToString() == tag)
+            if (e.Property.Name == "Value")
             {
-                comboBox.SelectedItem = item;
-                break;
+                TtsRateValueText.Text = $"{TtsRateSlider.Value:F1}x";
+                AutoSave();
             }
-        }
+        };
+
+        TtsVolumeSlider.PropertyChanged += (s, e) =>
+        {
+            if (e.Property.Name == "Value")
+            {
+                TtsVolumeValueText.Text = $"{(int)TtsVolumeSlider.Value}%";
+                AutoSave();
+            }
+        };
+
+        WhisperWindowSlider.PropertyChanged += (s, e) =>
+        {
+            if (e.Property.Name == "Value")
+            {
+                WhisperWindowValueText.Text = $"{(int)WhisperWindowSlider.Value} seconds";
+                AutoSave();
+            }
+        };
+
+        // ListBox selection for Piper voice catalog
+        PiperVoiceCatalogList.SelectionChanged += (s, e) =>
+        {
+            DownloadSelectedVoiceButton.IsEnabled = PiperVoiceCatalogList.SelectedItem != null;
+        };
     }
 
-    private static string? GetSelectedComboBoxTag(ComboBox comboBox)
+    private void AutoSave()
     {
-        return (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-    }
-
-    private void SaveButton_Click(object? sender, RoutedEventArgs e)
-    {
-        if (!ValidateInputs())
-            return;
+        if (_isLoading) return;
+        if (!ValidateInputs()) return;
 
         _settingsService.Update(settings =>
         {
@@ -260,6 +282,7 @@ public partial class SettingsWindow : Window
             settings.AutoCopyToClipboard = AutoCopyCheckBox.IsChecked ?? true;
             settings.AutoPasteAfterCopy = AutoPasteCheckBox.IsChecked ?? false;
             settings.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
+            settings.RunOnStartup = RunOnStartupCheckBox.IsChecked ?? false;
 
             // Debugging
             settings.EnableLogging = EnableLoggingCheckBox.IsChecked ?? false;
@@ -286,7 +309,7 @@ public partial class SettingsWindow : Window
             settings.AzureTtsVoice = GetSelectedComboBoxTag(AzureTtsVoiceComboBox) ?? "en-US-JennyNeural";
 
             // Faster-Whisper settings
-            settings.FasterWhisperModel = GetSelectedComboBoxTag(FasterWhisperModelComboBox) ?? "large-v3-turbo";
+            settings.FasterWhisperModel = GetSelectedComboBoxTag(FasterWhisperModelComboBox) ?? "base";
             settings.FasterWhisperLanguage = GetSelectedComboBoxTag(FasterWhisperLanguageComboBox) ?? "auto";
             settings.FasterWhisperUseGpu = FasterWhisperGpuCheckBox.IsChecked ?? true;
             if (int.TryParse(FasterWhisperDeviceIdTextBox.Text, out var deviceId))
@@ -310,8 +333,58 @@ public partial class SettingsWindow : Window
             settings.WhisperStreamingEnabled = WhisperStreamingEnabledCheckBox.IsChecked ?? true;
             settings.WhisperStreamingWindowSeconds = (int)WhisperWindowSlider.Value;
         });
+    }
 
-        Close();
+    private void UpdateSttSettingsPanelVisibility()
+    {
+        var selectedTag = GetSelectedComboBoxTag(SpeechProviderComboBox);
+        AzureSettingsPanel.IsVisible = selectedTag == "Azure";
+        OpenAISettingsPanel.IsVisible = selectedTag == "OpenAI";
+        FasterWhisperSettingsPanel.IsVisible = selectedTag == "FasterWhisper";
+        WhisperServerSettingsPanel.IsVisible = selectedTag == "WhisperServer";
+
+        // Update Faster-Whisper download panel visibility
+        if (selectedTag == "FasterWhisper")
+        {
+            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "faster-whisper-xxl", "faster-whisper-xxl.exe");
+            var exeExists = File.Exists(exePath);
+            FasterWhisperDownloadPanel.IsVisible = !exeExists;
+        }
+
+        // Update Whisper Server download panel visibility
+        if (selectedTag == "WhisperServer")
+        {
+            var serverExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", "ggml-base.en.bin");
+            var serverExists = File.Exists(serverExePath);
+            var modelExists = File.Exists(modelPath);
+            WhisperServerDownloadPanel.IsVisible = !serverExists || !modelExists;
+
+            // Update warning text based on what's missing
+            if (!serverExists)
+                WhisperServerWarningText.Text = "whisper.cpp server not found.";
+            else if (!modelExists)
+                WhisperServerWarningText.Text = "Default model (ggml-base.en.bin) not found.";
+
+            UpdateWhisperServerModelStatus();
+        }
+    }
+
+    private static void SelectComboBoxItemByTag(ComboBox comboBox, string tag)
+    {
+        foreach (var item in comboBox.Items.Cast<ComboBoxItem>())
+        {
+            if (item.Tag?.ToString() == tag)
+            {
+                comboBox.SelectedItem = item;
+                break;
+            }
+        }
+    }
+
+    private static string? GetSelectedComboBoxTag(ComboBox comboBox)
+    {
+        return (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
     }
 
     private async void CheckForUpdatesButton_Click(object? sender, RoutedEventArgs e)
@@ -393,34 +466,35 @@ public partial class SettingsWindow : Window
 
     private bool ValidateInputs()
     {
-        // Validate numeric inputs
-        if (!int.TryParse(DoubleTapIntervalTextBox.Text, out var doubleTapInterval) ||
-            doubleTapInterval < 100 || doubleTapInterval > 1000)
+        // Validate numeric inputs - be lenient during auto-save
+        if (!string.IsNullOrWhiteSpace(DoubleTapIntervalTextBox.Text))
         {
-            DoubleTapIntervalTextBox.Focus();
-            return false;
+            if (!int.TryParse(DoubleTapIntervalTextBox.Text, out var doubleTapInterval) ||
+                doubleTapInterval < 100 || doubleTapInterval > 1000)
+            {
+                return false;
+            }
         }
 
-        if (!int.TryParse(MaxKeyHoldTextBox.Text, out var maxKeyHold) ||
-            maxKeyHold < 50 || maxKeyHold > 500)
+        if (!string.IsNullOrWhiteSpace(MaxKeyHoldTextBox.Text))
         {
-            MaxKeyHoldTextBox.Focus();
-            return false;
+            if (!int.TryParse(MaxKeyHoldTextBox.Text, out var maxKeyHold) ||
+                maxKeyHold < 50 || maxKeyHold > 500)
+            {
+                return false;
+            }
         }
 
-        if (!int.TryParse(MaxRecordingDurationTextBox.Text, out var maxDuration) ||
-            maxDuration < 10 || maxDuration > 600)
+        if (!string.IsNullOrWhiteSpace(MaxRecordingDurationTextBox.Text))
         {
-            MaxRecordingDurationTextBox.Focus();
-            return false;
+            if (!int.TryParse(MaxRecordingDurationTextBox.Text, out var maxDuration) ||
+                maxDuration < 10 || maxDuration > 600)
+            {
+                return false;
+            }
         }
 
         return true;
-    }
-
-    private void CancelButton_Click(object? sender, RoutedEventArgs e)
-    {
-        Close();
     }
 
     private void RevealAzureKeyButton_Click(object? sender, RoutedEventArgs e)
@@ -449,11 +523,6 @@ public partial class SettingsWindow : Window
             OpenAIKeyTextBox.PasswordChar = '*';
             RevealOpenAIKeyButton.Content = "Show";
         }
-    }
-
-    private void TtsProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        UpdateTtsSettingsPanelVisibility();
     }
 
     private void UpdateTtsSettingsPanelVisibility()
@@ -509,47 +578,9 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void SetupTtsSliderEvents()
+    private void UpdateFasterWhisperGpuPanelVisibility()
     {
-        TtsRateSlider.PropertyChanged += (s, e) =>
-        {
-            if (e.Property.Name == "Value")
-            {
-                TtsRateValueText.Text = $"{TtsRateSlider.Value:F1}x";
-            }
-        };
-
-        TtsVolumeSlider.PropertyChanged += (s, e) =>
-        {
-            if (e.Property.Name == "Value")
-            {
-                TtsVolumeValueText.Text = $"{(int)TtsVolumeSlider.Value}%";
-            }
-        };
-    }
-
-    private void SetupFasterWhisperEvents()
-    {
-        FasterWhisperGpuCheckBox.IsCheckedChanged += (s, e) =>
-        {
-            UpdateFasterWhisperGpuPanelVisibility();
-        };
-    }
-
-    private void SetupWhisperStreamingEvents()
-    {
-        WhisperStreamingEnabledCheckBox.IsCheckedChanged += (s, e) =>
-        {
-            UpdateWhisperStreamingPanelVisibility();
-        };
-
-        WhisperWindowSlider.PropertyChanged += (s, e) =>
-        {
-            if (e.Property.Name == "Value")
-            {
-                WhisperWindowValueText.Text = $"{(int)WhisperWindowSlider.Value} seconds";
-            }
-        };
+        FasterWhisperGpuSettingsPanel.IsVisible = FasterWhisperGpuCheckBox.IsChecked == true;
     }
 
     private void UpdateWhisperStreamingPanelVisibility()
@@ -632,11 +663,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void UpdateFasterWhisperGpuPanelVisibility()
-    {
-        FasterWhisperGpuSettingsPanel.IsVisible = FasterWhisperGpuCheckBox.IsChecked == true;
-    }
-
     private async void DownloadWhisperServerButton_Click(object? sender, RoutedEventArgs e)
     {
         DownloadWhisperServerButton.IsEnabled = false;
@@ -675,11 +701,6 @@ public partial class SettingsWindow : Window
         {
             WhisperServerDownloadProgress.IsVisible = false;
         }
-    }
-
-    private void WhisperServerModelComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        UpdateWhisperServerModelStatus();
     }
 
     private void UpdateWhisperServerModelStatus()
@@ -848,11 +869,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void PiperLanguageFilterComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        FilterVoiceCatalog();
-    }
-
     private void FilterVoiceCatalog()
     {
         if (_voiceCatalog == null) return;
@@ -896,11 +912,6 @@ public partial class SettingsWindow : Window
         }
 
         DownloadSelectedVoiceButton.IsEnabled = false;
-    }
-
-    private void PiperVoiceCatalogList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        DownloadSelectedVoiceButton.IsEnabled = PiperVoiceCatalogList.SelectedItem != null;
     }
 
     private async void DownloadSelectedVoiceButton_Click(object? sender, RoutedEventArgs e)
@@ -953,6 +964,29 @@ public partial class SettingsWindow : Window
         {
             VoiceDownloadProgress.IsVisible = false;
             DownloadSelectedVoiceButton.IsEnabled = PiperVoiceCatalogList.SelectedItem != null;
+        }
+    }
+
+    private async void RestoreDefaultsButton_Click(object? sender, RoutedEventArgs e)
+    {
+        // Show confirmation dialog
+        var dialog = new ConfirmationDialog(
+            "Restore Defaults",
+            "Are you sure you want to restore all settings to their default values?\n\nThis will reset all your preferences and cannot be undone.");
+
+        await dialog.ShowDialog(this);
+
+        if (dialog.Result)
+        {
+            // Reset to defaults
+            _isLoading = true; // Prevent auto-save during reload
+
+            _settingsService.ResetToDefaults();
+            LoadSettings();
+            UpdateSttSettingsPanelVisibility();
+            UpdateTtsSettingsPanelVisibility();
+
+            _isLoading = false;
         }
     }
 }

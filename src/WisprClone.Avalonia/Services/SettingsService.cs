@@ -115,4 +115,18 @@ public class SettingsService : ISettingsService
         // Fire and forget save
         _ = SaveAsync();
     }
+
+    /// <inheritdoc />
+    public void ResetToDefaults()
+    {
+        lock (_lock)
+        {
+            _settings = new AppSettings();
+        }
+
+        SettingsChanged?.Invoke(this, _settings);
+
+        // Fire and forget save
+        _ = SaveAsync();
+    }
 }
