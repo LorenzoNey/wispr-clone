@@ -75,4 +75,4 @@ installer/output/
 # Claude Code settings (user-specific)
 .claude/
 
-nulapple-secrets.txt
+nul
