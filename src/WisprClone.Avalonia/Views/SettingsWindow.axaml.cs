@@ -346,7 +346,7 @@ public partial class SettingsWindow : Window
         // Update Faster-Whisper download panel visibility
         if (selectedTag == "FasterWhisper")
         {
-            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "faster-whisper-xxl", "faster-whisper-xxl.exe");
+            var exePath = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "faster-whisper-xxl", "faster-whisper-xxl.exe");
             var exeExists = File.Exists(exePath);
             FasterWhisperDownloadPanel.IsVisible = !exeExists;
         }
@@ -354,8 +354,8 @@ public partial class SettingsWindow : Window
         // Update Whisper Server download panel visibility
         if (selectedTag == "WhisperServer")
         {
-            var serverExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "whisper-server.exe");
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", "ggml-base.en.bin");
+            var serverExePath = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "whisper-server", "whisper-server.exe");
+            var modelPath = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "whisper-server", "models", "ggml-base.en.bin");
             var serverExists = File.Exists(serverExePath);
             var modelExists = File.Exists(modelPath);
             WhisperServerDownloadPanel.IsVisible = !serverExists || !modelExists;
@@ -535,7 +535,7 @@ public partial class SettingsWindow : Window
         // Update Piper download panel visibility
         if (selectedTag == "Piper")
         {
-            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "piper.exe");
+            var exePath = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "piper", "piper.exe");
             var exeExists = File.Exists(exePath);
             PiperDownloadPanel.IsVisible = !exeExists;
 
@@ -709,7 +709,7 @@ public partial class SettingsWindow : Window
         if (string.IsNullOrEmpty(selectedModel)) return;
 
         var modelFileName = $"ggml-{selectedModel}.bin";
-        var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper-server", "models", modelFileName);
+        var modelPath = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "whisper-server", "models", modelFileName);
         var modelExists = File.Exists(modelPath);
 
         WhisperServerModelDownloadPanel.IsVisible = !modelExists;
@@ -772,7 +772,7 @@ public partial class SettingsWindow : Window
 
         try
         {
-            var voicesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper", "voices");
+            var voicesDir = Path.Combine(Services.DownloadHelper.GetDataDirectory(), "piper", "voices");
             if (Directory.Exists(voicesDir))
             {
                 var onnxFiles = Directory.GetFiles(voicesDir, "*.onnx", SearchOption.AllDirectories);
@@ -780,7 +780,7 @@ public partial class SettingsWindow : Window
                 {
                     var fileName = Path.GetFileNameWithoutExtension(file);
                     var relativePath = Path.GetRelativePath(
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "piper"),
+                        Path.Combine(Services.DownloadHelper.GetDataDirectory(), "piper"),
                         file);
 
                     // Parse voice name: en_US-amy-medium -> Language: en_US, Name: amy, Quality: medium
