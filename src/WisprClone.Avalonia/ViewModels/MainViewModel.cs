@@ -255,14 +255,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         try
         {
+            // First, simulate Ctrl+C to copy any selected text from the active window
+            Log("TTS: Simulating copy to capture selected text...");
+            await _keyboardSimulator.SimulateCopyAsync();
+
+            // Read clipboard (now contains selected text, if any was selected)
             Log("TTS: Reading clipboard...");
             var text = await _clipboardService.GetTextAsync();
             Log($"TTS: Clipboard text length: {text?.Length ?? 0}");
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                Log("TTS: Nothing to speak (empty clipboard)");
-                _overlayViewModel?.ShowTemporaryMessage("Nothing to speak", 2000);
+                Log("TTS: Nothing to speak (no text selected or clipboard empty)");
+                _overlayViewModel?.ShowTemporaryMessage("No text selected", 2000);
                 SetAppMode(AppMode.Idle);
                 return;
             }

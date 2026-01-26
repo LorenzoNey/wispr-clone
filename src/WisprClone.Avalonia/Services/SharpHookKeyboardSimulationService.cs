@@ -24,6 +24,41 @@ public class SharpHookKeyboardSimulationService : IKeyboardSimulationService
 
     public bool IsAvailable => true;
 
+    public async Task<bool> SimulateCopyAsync()
+    {
+        try
+        {
+            Log("SimulateCopyAsync called");
+
+            // Small delay to ensure we don't interfere with the hotkey
+            await Task.Delay(50);
+
+            if (OperatingSystem.IsMacOS())
+            {
+                // macOS: Use Cmd+C
+                Log("Simulating copy with Cmd+C (macOS)");
+                await SimulateKeyComboAsync(KeyCode.VcLeftMeta, KeyCode.VcC);
+            }
+            else
+            {
+                // Windows/Linux: Use Ctrl+C
+                Log("Simulating copy with Ctrl+C (Windows/Linux)");
+                await SimulateKeyComboAsync(KeyCode.VcLeftControl, KeyCode.VcC);
+            }
+
+            // Wait for clipboard to be updated
+            await Task.Delay(100);
+
+            Log("SimulateCopyAsync completed");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"SimulateCopyAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
     public async Task<bool> SimulatePasteAsync()
     {
         try

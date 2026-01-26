@@ -271,15 +271,26 @@ public class AzureTextToSpeechService : ITextToSpeechService
             ? (double)(adjustedOffset + e.WordLength) / _currentText.Length * 100
             : 0;
 
-        SpeakProgress?.Invoke(this, new SpeechProgressEventArgs(progress, adjustedOffset, _currentText.Length));
+        // Delay the word boundary event by 500ms to sync highlighting with audio playback
+        // Azure sends word boundaries ahead of actual audio playback
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500);
 
-        // Emit word boundary event with adjusted offset
-        // AudioOffset is in 100-nanosecond units (ticks)
-        WordBoundary?.Invoke(this, new WordBoundaryEventArgs(
-            adjustedOffset,
-            (int)e.WordLength,
-            e.Text,
-            TimeSpan.FromTicks((long)e.AudioOffset)));
+            // Only emit if still speaking (not cancelled)
+            if (CurrentState != SynthesisState.Speaking)
+                return;
+
+            SpeakProgress?.Invoke(this, new SpeechProgressEventArgs(progress, adjustedOffset, _currentText.Length));
+
+            // Emit word boundary event with adjusted offset
+            // AudioOffset is in 100-nanosecond units (ticks)
+            WordBoundary?.Invoke(this, new WordBoundaryEventArgs(
+                adjustedOffset,
+                (int)e.WordLength,
+                e.Text,
+                TimeSpan.FromTicks((long)e.AudioOffset)));
+        });
     }
 
     private void OnSynthesisCanceled(object? sender, Microsoft.CognitiveServices.Speech.SpeechSynthesisEventArgs e)
