@@ -45,6 +45,11 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
     private static int _serverPort = 8178;
     private static string? _currentLoadedModel;
 
+    // PID file to track our whisper-server instance
+    private static readonly string PidFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "WisprClone", "whisper-server.pid");
+
     public event EventHandler<TranscriptionEventArgs>? RecognitionPartial;
     public event EventHandler<TranscriptionEventArgs>? RecognitionCompleted;
     public event EventHandler<RecognitionErrorEventArgs>? RecognitionError;
@@ -113,6 +118,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 #if WINDOWS
         var settings = _settingsService.Current;
         var requestedModel = settings.WhisperCppModel;
+        _serverPort = settings.WhisperCppServerPort;
 
         lock (_serverLock)
         {
@@ -132,9 +138,37 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             }
         }
 
+        // Check if our previously started server is still running
+        var savedPid = ReadSavedPid();
+        if (savedPid != null && await IsServerRespondingAsync())
+        {
+            // Verify it's actually our server process
+            try
+            {
+                var process = Process.GetProcessById(savedPid.Value);
+                if (process.ProcessName.Equals("whisper-server", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log($"Found our existing server (PID {savedPid}) on port {_serverPort}, reusing it");
+                    lock (_serverLock)
+                    {
+                        _serverStarted = true;
+                        _currentLoadedModel = requestedModel; // Assume it has the right model
+                    }
+                    return;
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Process doesn't exist, will start a new one
+                Log($"Saved PID {savedPid} no longer exists");
+            }
+        }
+
+        // Kill our orphaned whisper-server process (if any) before starting a new one
+        KillOrphanedServerProcesses();
+
         var serverExe = GetServerExePath();
         var modelPath = GetModelPath();
-        _serverPort = settings.WhisperCppServerPort;
 
         if (!File.Exists(serverExe))
         {
@@ -200,6 +234,9 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
                 _serverStarted = true;
                 _currentLoadedModel = requestedModel;
                 Log($"Server started with PID: {_serverProcess.Id}, model: {requestedModel}");
+
+                // Save the PID so we can track this instance across app restarts
+                SavePidFile(_serverProcess.Id);
             }
             catch (Exception ex)
             {
@@ -237,6 +274,139 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         }
 
         throw new TimeoutException("Whisper server failed to start within 30 seconds");
+    }
+
+    /// <summary>
+    /// Checks if a whisper server is already responding on the configured port.
+    /// </summary>
+    private async Task<bool> IsServerRespondingAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var response = await _httpClient.GetAsync($"http://127.0.0.1:{_serverPort}/", cts.Token);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Kills only the whisper-server process that WisprClone previously started (tracked via PID file).
+    /// Does not kill other whisper-server instances that may be running independently.
+    /// </summary>
+    private void KillOrphanedServerProcesses()
+    {
+        try
+        {
+            var savedPid = ReadSavedPid();
+            if (savedPid == null)
+            {
+                Log("No saved PID file found, no orphaned process to kill");
+                return;
+            }
+
+            Log($"Found saved PID {savedPid}, checking if process is still running...");
+
+            try
+            {
+                var process = Process.GetProcessById(savedPid.Value);
+
+                // Verify it's actually a whisper-server process (not a reused PID)
+                if (process.ProcessName.Equals("whisper-server", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log($"Killing our orphaned whisper-server PID {savedPid}");
+                    process.Kill();
+                    process.WaitForExit(3000);
+                    process.Dispose();
+
+                    // Give the system a moment to release resources
+                    Thread.Sleep(500);
+                }
+                else
+                {
+                    Log($"PID {savedPid} is now a different process ({process.ProcessName}), not killing");
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Process with this PID doesn't exist anymore
+                Log($"Process with PID {savedPid} no longer exists");
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to kill process {savedPid}: {ex.Message}");
+            }
+
+            // Clean up the PID file
+            DeletePidFile();
+        }
+        catch (Exception ex)
+        {
+            Log($"Error while killing orphaned process: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Saves the server process ID to a file for tracking across app restarts.
+    /// </summary>
+    private void SavePidFile(int pid)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(PidFilePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            File.WriteAllText(PidFilePath, pid.ToString());
+            Log($"Saved server PID {pid} to {PidFilePath}");
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to save PID file: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reads the saved server process ID from the PID file.
+    /// </summary>
+    private int? ReadSavedPid()
+    {
+        try
+        {
+            if (!File.Exists(PidFilePath))
+                return null;
+
+            var content = File.ReadAllText(PidFilePath).Trim();
+            if (int.TryParse(content, out var pid))
+                return pid;
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to read PID file: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Deletes the PID file.
+    /// </summary>
+    private void DeletePidFile()
+    {
+        try
+        {
+            if (File.Exists(PidFilePath))
+            {
+                File.Delete(PidFilePath);
+                Log("Deleted PID file");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to delete PID file: {ex.Message}");
+        }
     }
 
     public Task StartRecognitionAsync(CancellationToken cancellationToken = default)
