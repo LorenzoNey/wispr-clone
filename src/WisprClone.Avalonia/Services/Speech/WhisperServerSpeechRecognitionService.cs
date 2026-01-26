@@ -256,6 +256,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             _recordingStartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _confirmedWords.Clear();
             _lastConfirmedTimestamp = 0;
+            _isStreamingInProgress = false;
 
             lock (_audioLock)
             {
@@ -451,7 +452,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
             // whisper.cpp server returns {"text": "..."}
             if (root.TryGetProperty("text", out var textProp))
             {
-                return textProp.GetString()?.Trim() ?? string.Empty;
+                return CleanTranscriptionText(textProp.GetString());
             }
 
             // Alternative format with segments
@@ -462,7 +463,7 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
                 {
                     if (segment.TryGetProperty("text", out var segText))
                     {
-                        var text = segText.GetString()?.Trim();
+                        var text = CleanTranscriptionText(segText.GetString());
                         if (!string.IsNullOrEmpty(text))
                             texts.Add(text);
                     }
@@ -476,8 +477,29 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         {
             Log($"Failed to parse response: {ex.Message}");
             // Return raw text if not JSON
-            return responseText.Trim();
+            return CleanTranscriptionText(responseText);
         }
+    }
+
+    /// <summary>
+    /// Cleans transcription text by removing carriage returns, newlines, and extra whitespace.
+    /// </summary>
+    private static string CleanTranscriptionText(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        // Replace carriage returns and newlines with spaces
+        var cleaned = text
+            .Replace("\r\n", " ")
+            .Replace("\r", " ")
+            .Replace("\n", " ");
+
+        // Collapse multiple spaces into single space and trim
+        while (cleaned.Contains("  "))
+            cleaned = cleaned.Replace("  ", " ");
+
+        return cleaned.Trim();
     }
 
 #if WINDOWS
@@ -501,66 +523,169 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
         }
     }
 
+    // Track if a streaming transcription is already in progress
+    private bool _isStreamingInProgress = false;
+
     /// <summary>
-    /// Timer handler for streaming transcription using sliding window approach.
+    /// Timer handler for streaming transcription.
+    /// Uses a simple approach: transcribe all audio accumulated so far for accurate progressive results.
     /// </summary>
     private async void OnStreamingTimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        if (!_isRecording || _fullAudioStream == null) return;
+        Log("Streaming timer fired");
+
+        if (!_isRecording)
+        {
+            Log("Streaming: not recording, skipping");
+            return;
+        }
+
+        if (_fullAudioStream == null)
+        {
+            Log("Streaming: no audio stream, skipping");
+            return;
+        }
+
+        // Prevent overlapping transcriptions
+        if (_isStreamingInProgress)
+        {
+            Log("Streaming: previous transcription still in progress, skipping");
+            return;
+        }
 
         try
         {
-            var windowSeconds = _settingsService.Current.WhisperStreamingWindowSeconds;
-            var (audioData, pcmData) = ExtractLastNSecondsWithPcm(windowSeconds);
+            _isStreamingInProgress = true;
 
-            if (audioData == null || pcmData == null || audioData.Length < 8000) // Too short (~0.25s at 16kHz 16-bit mono)
+            // Extract ALL audio recorded so far (not just a window)
+            var (audioData, pcmData) = ExtractAllAudioWithPcm();
+
+            Log($"Streaming: extracted audio - WAV: {audioData?.Length ?? 0} bytes, PCM: {pcmData?.Length ?? 0} bytes");
+
+            if (audioData == null || pcmData == null || audioData.Length < 16000) // Too short (~0.5s)
             {
+                Log("Streaming: audio too short, skipping");
                 return;
             }
 
-            // Check if audio is silent - skip processing if so
-            if (IsAudioSilent(pcmData))
+            // Check if the recent audio is silent - use last 2 seconds for this check
+            var recentPcm = GetRecentPcmData(pcmData, 2);
+            var (isSilent, rmsValue) = IsAudioSilentWithRms(recentPcm);
+            Log($"Streaming: Recent RMS={rmsValue:F0}, silent={isSilent}");
+
+            if (isSilent)
             {
-                Log("Streaming: skipping silent audio");
+                Log("Streaming: recent audio is silent, skipping transcription");
                 return;
             }
 
-            // Calculate time offset of this window
             var totalRecordedSeconds = GetTotalRecordedSeconds();
-            var windowStartTime = Math.Max(0, totalRecordedSeconds - windowSeconds);
+            Log($"Streaming: transcribing {totalRecordedSeconds:F1}s of audio");
 
-            Log($"Streaming: transcribing {windowSeconds}s window starting at {windowStartTime:F1}s");
+            // Simple transcription of all audio - let Whisper handle it
+            var text = await TranscribeSimpleAsync(audioData);
 
-            // Transcribe with word timestamps
-            var words = await TranscribeWithTimestampsAsync(audioData, windowStartTime);
-
-            if (words.Count > 0)
+            if (!string.IsNullOrEmpty(text))
             {
-                // Merge with confirmed words
-                MergeWords(words, windowStartTime);
-
-                // Emit partial result
-                var currentText = string.Join(" ", _confirmedWords.Select(w => w.Text));
-                if (!string.IsNullOrEmpty(currentText))
-                {
-                    RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(currentText, false, false));
-                    Log($"Streaming partial: {_confirmedWords.Count} words, last timestamp: {_lastConfirmedTimestamp:F2}s");
-                }
+                RecognitionPartial?.Invoke(this, new TranscriptionEventArgs(text, false, false));
+                Log($"Streaming partial: '{text.Substring(0, Math.Min(50, text.Length))}...'");
+            }
+            else
+            {
+                Log("Streaming: no text returned from transcription");
             }
         }
         catch (Exception ex)
         {
-            Log($"Streaming error: {ex.Message}");
+            Log($"Streaming error: {ex.Message}\n{ex.StackTrace}");
             // Don't throw - just skip this cycle
+        }
+        finally
+        {
+            _isStreamingInProgress = false;
         }
     }
 
     /// <summary>
-    /// Checks if audio data is silent by calculating RMS and comparing to threshold.
+    /// Gets the last N seconds of PCM data from a buffer.
     /// </summary>
-    private bool IsAudioSilent(byte[] pcmData, double silenceThreshold = 500)
+    private byte[] GetRecentPcmData(byte[] fullPcm, int seconds)
     {
-        if (pcmData.Length < 2) return true;
+        var bytesPerSecond = 16000 * 2; // 16kHz, 16-bit mono
+        var bytesNeeded = seconds * bytesPerSecond;
+
+        if (fullPcm.Length <= bytesNeeded)
+            return fullPcm;
+
+        var result = new byte[bytesNeeded];
+        Array.Copy(fullPcm, fullPcm.Length - bytesNeeded, result, 0, bytesNeeded);
+        return result;
+    }
+
+    /// <summary>
+    /// Extracts all audio recorded so far.
+    /// Returns both WAV data (for transcription) and raw PCM data (for silence detection).
+    /// </summary>
+    private (byte[]? wavData, byte[]? pcmData) ExtractAllAudioWithPcm()
+    {
+        lock (_audioLock)
+        {
+            if (_fullAudioStream == null || _fullAudioWriter == null) return (null, null);
+
+            _fullAudioWriter.Flush();
+
+            var totalBytes = _fullAudioStream.Position;
+            if (totalBytes == 0) return (null, null);
+
+            // Read all PCM data
+            _fullAudioStream.Position = 0;
+            var pcmBuffer = new byte[totalBytes];
+            _fullAudioStream.Read(pcmBuffer, 0, (int)totalBytes);
+            _fullAudioStream.Position = totalBytes; // Reset to end
+
+            return (CreateWavFromPcm(pcmBuffer), pcmBuffer);
+        }
+    }
+
+    /// <summary>
+    /// Simple transcription without word timestamps - faster and more reliable for streaming.
+    /// </summary>
+    private async Task<string> TranscribeSimpleAsync(byte[] audioData)
+    {
+        await EnsureServerRunningAsync();
+
+        var settings = _settingsService.Current;
+        var url = $"http://127.0.0.1:{_serverPort}/inference";
+
+        using var content = new MultipartFormDataContent();
+
+        // Add audio file
+        var audioContent = new ByteArrayContent(audioData);
+        audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        content.Add(audioContent, "file", "audio.wav");
+
+        // Use simple json format (faster than verbose_json)
+        content.Add(new StringContent("json"), "response_format");
+
+        var language = settings.FasterWhisperLanguage;
+        if (string.IsNullOrEmpty(language) || language.ToLower() == "auto")
+            language = "en";
+        content.Add(new StringContent(language), "language");
+
+        var response = await _httpClient.PostAsync(url, content);
+        response.EnsureSuccessStatusCode();
+
+        var responseText = await response.Content.ReadAsStringAsync();
+        return ParseServerResponse(responseText);
+    }
+
+    /// <summary>
+    /// Checks if audio data is silent by calculating RMS and comparing to threshold.
+    /// Returns both the result and the RMS value for logging.
+    /// </summary>
+    private (bool isSilent, double rms) IsAudioSilentWithRms(byte[] pcmData, double silenceThreshold = 50)
+    {
+        if (pcmData.Length < 2) return (true, 0);
 
         // PCM 16-bit: 2 bytes per sample, little-endian
         double sumSquares = 0;
@@ -574,8 +699,15 @@ public class WhisperServerSpeechRecognitionService : ISpeechRecognitionService
 
         double rms = Math.Sqrt(sumSquares / sampleCount);
 
-        // Threshold: ~500 is very quiet (max is 32767 for 16-bit audio)
-        return rms < silenceThreshold;
+        // Threshold: ~50 catches actual silence while allowing quiet speech
+        // (max RMS is 32767 for 16-bit audio, normal speech is typically 100-500+)
+        return (rms < silenceThreshold, rms);
+    }
+
+    // Keep the old method for compatibility but delegate to new one
+    private bool IsAudioSilent(byte[] pcmData, double silenceThreshold = 50)
+    {
+        return IsAudioSilentWithRms(pcmData, silenceThreshold).isSilent;
     }
 
     /// <summary>

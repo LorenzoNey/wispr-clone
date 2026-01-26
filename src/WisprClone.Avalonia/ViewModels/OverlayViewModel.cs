@@ -58,6 +58,7 @@ public partial class OverlayViewModel : ViewModelBase
     private readonly ISpeechRecognitionService _speechService;
     private readonly ITextToSpeechService _ttsService;
     private readonly ISettingsService _settingsService;
+    private readonly ILoggingService _loggingService;
     private readonly AudioLevelMonitor _audioMonitor;
     private readonly DispatcherTimer _elapsedTimer;
     private readonly DispatcherTimer _temporaryMessageTimer;
@@ -231,11 +232,12 @@ public partial class OverlayViewModel : ViewModelBase
         _ => "Ctrl+Ctrl to toggle"
     };
 
-    public OverlayViewModel(ISpeechRecognitionService speechService, ITextToSpeechService ttsService, ISettingsService settingsService)
+    public OverlayViewModel(ISpeechRecognitionService speechService, ITextToSpeechService ttsService, ISettingsService settingsService, ILoggingService loggingService)
     {
         _speechService = speechService;
         _ttsService = ttsService;
         _settingsService = settingsService;
+        _loggingService = loggingService;
         _audioMonitor = new AudioLevelMonitor();
 
         // Initialize elapsed time timer
@@ -284,16 +286,23 @@ public partial class OverlayViewModel : ViewModelBase
         }
         AvailableTtsProviders = ttsProviderOptions;
 
-        // Set initial selections based on current settings
+        // Set initial selections based on actual active provider (may differ from settings if fallback occurred)
         SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == settingsService.Current.RecognitionLanguage)
                            ?? AvailableLanguages.First();
-        SelectedProvider = AvailableProviders.FirstOrDefault(p => p.Provider == settingsService.Current.SpeechProvider)
+
+        // Use active provider from service manager if available (handles fallback case)
+        var activeSpeechProvider = (speechService as Services.Speech.SpeechServiceManager)?.ActiveProvider
+                                   ?? settingsService.Current.SpeechProvider;
+        var activeTtsProvider = (ttsService as Services.Tts.TtsServiceManager)?.ActiveProvider
+                                ?? settingsService.Current.TtsProvider;
+
+        SelectedProvider = AvailableProviders.FirstOrDefault(p => p.Provider == activeSpeechProvider)
                            ?? AvailableProviders.First();
-        SelectedTtsProvider = AvailableTtsProviders.FirstOrDefault(p => p.Provider == settingsService.Current.TtsProvider)
+        SelectedTtsProvider = AvailableTtsProviders.FirstOrDefault(p => p.Provider == activeTtsProvider)
                               ?? AvailableTtsProviders.First();
 
-        // Initialize TTS voices based on selected provider
-        UpdateTtsVoicesForProvider(settingsService.Current.TtsProvider);
+        // Initialize TTS voices based on active provider
+        UpdateTtsVoicesForProvider(activeTtsProvider);
 
         // Subscribe to speech service events
         _speechService.RecognitionPartial += OnRecognitionPartial;
@@ -535,10 +544,17 @@ public partial class OverlayViewModel : ViewModelBase
 
     private void OnRecognitionPartial(object? sender, TranscriptionEventArgs e)
     {
-        DispatchToUI(() =>
+        var preview = e.Text?.Length > 50 ? e.Text.Substring(0, 50) + "..." : e.Text ?? "";
+        _loggingService.Log("OverlayVM", $"OnRecognitionPartial received: '{preview}' (length={e.Text?.Length ?? 0})");
+
+        // Use InvokeAsync with high priority for immediate UI update
+        Dispatcher.UIThread.InvokeAsync(() =>
         {
-            TranscriptionText = string.IsNullOrEmpty(e.Text) ? "Listening..." : e.Text;
-        });
+            var newText = string.IsNullOrEmpty(e.Text) ? "Listening..." : e.Text;
+            var uiPreview = newText.Length > 50 ? newText.Substring(0, 50) + "..." : newText;
+            _loggingService.Log("OverlayVM", $"Setting TranscriptionText on UI thread: '{uiPreview}'");
+            TranscriptionText = newText;
+        }, DispatcherPriority.Send); // Highest priority for immediate update
     }
 
     private void OnRecognitionCompleted(object? sender, TranscriptionEventArgs e)

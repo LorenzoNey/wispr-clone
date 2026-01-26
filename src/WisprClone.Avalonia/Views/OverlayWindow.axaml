@@ -248,21 +248,20 @@
             </Border>
 
             <!-- Transcription text area (STT mode) -->
-            <TextBox x:Name="TranscriptionTextBox"
-                     Grid.Row="1"
-                     Text="{Binding TranscriptionText}"
-                     IsReadOnly="True"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Foreground="White"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     FontSize="13"
-                     Padding="14,6,14,8"
-                     MinHeight="30"
-                     MaxHeight="200"
-                     CaretBrush="Transparent"
-                     IsVisible="{Binding !IsTtsSpeaking}"/>
+            <ScrollViewer x:Name="TranscriptionScrollViewer"
+                          Grid.Row="1"
+                          IsVisible="{Binding !IsTtsSpeaking}"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          MinHeight="30"
+                          MaxHeight="200">
+                <TextBlock x:Name="TranscriptionTextBlock"
+                           Text="{Binding TranscriptionText}"
+                           TextWrapping="Wrap"
+                           Foreground="White"
+                           FontSize="13"
+                           Padding="14,6,14,8"/>
+            </ScrollViewer>
 
             <!-- TTS word display area with highlighting -->
             <ScrollViewer x:Name="TtsScrollViewer"

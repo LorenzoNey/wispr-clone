@@ -125,8 +125,8 @@ public partial class OverlayWindow : Window
         // Track position changes
         PositionChanged += OnWindowPositionChanged;
 
-        // Listen to TextBox size changes for auto-resize
-        TranscriptionTextBox.PropertyChanged += (_, args) =>
+        // Listen to TextBlock size changes for auto-resize
+        TranscriptionTextBlock.PropertyChanged += (_, args) =>
         {
             if (args.Property.Name == "Bounds")
             {
@@ -185,7 +185,10 @@ public partial class OverlayWindow : Window
         if (_viewModel != null && Clipboard != null)
         {
             var text = _viewModel.TranscriptionText;
-            if (!string.IsNullOrWhiteSpace(text) && text != "Press Ctrl+Ctrl to start...")
+            if (!string.IsNullOrWhiteSpace(text) &&
+                text != "Press Ctrl+Ctrl to start..." &&
+                text != "Ctrl+Ctrl: STT | Shift+Shift: TTS" &&
+                text != "Listening...")
             {
                 await Clipboard.SetTextAsync(text);
             }
@@ -226,15 +229,11 @@ public partial class OverlayWindow : Window
 
     private void ScrollToBottom()
     {
-        // TextBox auto-scrolls when caret is at end
+        // Scroll the ScrollViewer to the bottom to show latest text
         Dispatcher.UIThread.Post(() =>
         {
-            var text = TranscriptionTextBox.Text;
-            if (text != null)
-            {
-                TranscriptionTextBox.CaretIndex = text.Length;
-            }
-        });
+            TranscriptionScrollViewer.ScrollToEnd();
+        }, DispatcherPriority.Background); // Use Background priority to let layout complete first
     }
 
     private void ScrollToCurrentWord(int wordIndex)
