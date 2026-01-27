@@ -83,18 +83,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         var settings = settingsService.Current;
 
-        // STT hotkey: Ctrl+Ctrl double-tap
+        // STT hotkey: configurable double-tap (default: Ctrl+Ctrl)
         _sttHotkeyDetector = new DoubleKeyTapDetector(
             keyboardHook,
-            GlobalKeyCode.LeftCtrl,
+            HotkeyToKeyCode(settings.SttHotkey),
             settings.DoubleTapIntervalMs,
             settings.MaxKeyHoldDurationMs,
             msg => loggingService.Log("STT-Hotkey", msg));
 
-        // TTS hotkey: Shift+Shift double-tap
+        // TTS hotkey: configurable double-tap (default: Shift+Shift)
         _ttsHotkeyDetector = new DoubleKeyTapDetector(
             keyboardHook,
-            GlobalKeyCode.LeftShift,
+            HotkeyToKeyCode(settings.TtsHotkey),
             settings.TtsDoubleTapIntervalMs,
             settings.TtsMaxKeyHoldDurationMs,
             msg => loggingService.Log("TTS-Hotkey", msg));
@@ -232,6 +232,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _loggingService.Log("MainViewModel", message);
     }
+
+    private static GlobalKeyCode HotkeyToKeyCode(string hotkey) => hotkey switch
+    {
+        "Ctrl" => GlobalKeyCode.LeftCtrl,
+        "Shift" => GlobalKeyCode.LeftShift,
+        "Alt" => GlobalKeyCode.LeftAlt,
+        _ => GlobalKeyCode.LeftCtrl
+    };
 
     private void SetAppMode(AppMode newMode)
     {

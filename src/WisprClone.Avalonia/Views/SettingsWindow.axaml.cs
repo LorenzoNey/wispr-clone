@@ -67,6 +67,9 @@ public partial class SettingsWindow : Window
         SelectComboBoxItemByTag(LanguageComboBox, settings.RecognitionLanguage);
 
         // Hotkey settings
+        SelectComboBoxItemByTag(SttHotkeyComboBox, settings.SttHotkey ?? "Ctrl");
+        SelectComboBoxItemByTag(TtsHotkeyComboBox, settings.TtsHotkey ?? "Shift");
+        UpdateHotkeyConflictWarning();
         DoubleTapIntervalTextBox.Text = settings.DoubleTapIntervalMs.ToString();
         MaxKeyHoldTextBox.Text = settings.MaxKeyHoldDurationMs.ToString();
 
@@ -170,6 +173,8 @@ public partial class SettingsWindow : Window
         SpeechProviderComboBox.SelectionChanged += (s, e) => { UpdateSttSettingsPanelVisibility(); AutoSave(); };
         TtsProviderComboBox.SelectionChanged += (s, e) => { UpdateTtsSettingsPanelVisibility(); AutoSave(); };
         LanguageComboBox.SelectionChanged += (s, e) => AutoSave();
+        SttHotkeyComboBox.SelectionChanged += (s, e) => { UpdateHotkeyConflictWarning(); AutoSave(); };
+        TtsHotkeyComboBox.SelectionChanged += (s, e) => { UpdateHotkeyConflictWarning(); AutoSave(); };
         FasterWhisperModelComboBox.SelectionChanged += (s, e) => AutoSave();
         FasterWhisperLanguageComboBox.SelectionChanged += (s, e) => AutoSave();
         FasterWhisperComputeTypeComboBox.SelectionChanged += (s, e) => AutoSave();
@@ -263,6 +268,8 @@ public partial class SettingsWindow : Window
             settings.RecognitionLanguage = GetSelectedComboBoxTag(LanguageComboBox) ?? "en-US";
 
             // Hotkey settings
+            settings.SttHotkey = GetSelectedComboBoxTag(SttHotkeyComboBox) ?? "Ctrl";
+            settings.TtsHotkey = GetSelectedComboBoxTag(TtsHotkeyComboBox) ?? "Shift";
             if (int.TryParse(DoubleTapIntervalTextBox.Text, out var doubleTapInterval))
             {
                 settings.DoubleTapIntervalMs = Math.Clamp(doubleTapInterval, 100, 1000);
@@ -586,6 +593,13 @@ public partial class SettingsWindow : Window
     private void UpdateWhisperStreamingPanelVisibility()
     {
         WhisperStreamingSettingsPanel.IsVisible = WhisperStreamingEnabledCheckBox.IsChecked == true;
+    }
+
+    private void UpdateHotkeyConflictWarning()
+    {
+        var sttKey = GetSelectedComboBoxTag(SttHotkeyComboBox);
+        var ttsKey = GetSelectedComboBoxTag(TtsHotkeyComboBox);
+        HotkeyConflictWarning.IsVisible = sttKey == ttsKey;
     }
 
     private async void DownloadFasterWhisperButton_Click(object? sender, RoutedEventArgs e)

@@ -21,7 +21,8 @@ public class AppSettings
     // Language Settings
     public string RecognitionLanguage { get; set; } = "en-US";
 
-    // STT Hotkey Settings (Ctrl+Ctrl)
+    // STT Hotkey Settings (Ctrl+Ctrl by default)
+    public string SttHotkey { get; set; } = "Ctrl";  // "Ctrl", "Shift", or "Alt"
     public int DoubleTapIntervalMs { get; set; } = 400;
     public int MaxKeyHoldDurationMs { get; set; } = 200;
 
@@ -62,7 +63,8 @@ public class AppSettings
     // Piper TTS Settings
     public string PiperVoicePath { get; set; } = "voices/en_US-amy-medium.onnx";
 
-    // TTS Hotkey Settings (Shift+Shift)
+    // TTS Hotkey Settings (Shift+Shift by default)
+    public string TtsHotkey { get; set; } = "Shift";  // "Ctrl", "Shift", or "Alt"
     public int TtsDoubleTapIntervalMs { get; set; } = 400;
     public int TtsMaxKeyHoldDurationMs { get; set; } = 200;
 

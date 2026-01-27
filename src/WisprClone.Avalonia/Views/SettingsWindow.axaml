@@ -747,6 +747,39 @@
                             <StackPanel>
                                 <TextBlock Text="Hotkey Configuration" Classes="cardTitle"/>
 
+                                <!-- STT Hotkey Selection -->
+                                <TextBlock Text="Speech-to-Text Hotkey" Classes="label"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <ComboBox x:Name="SttHotkeyComboBox" Classes="settings" Width="200">
+                                        <ComboBoxItem Content="Ctrl (or Cmd on Mac)" Tag="Ctrl"/>
+                                        <ComboBoxItem Content="Shift" Tag="Shift"/>
+                                        <ComboBoxItem Content="Alt (or Option on Mac)" Tag="Alt"/>
+                                    </ComboBox>
+                                    <TextBlock Text="+ same key (double-tap)" Classes="inlineLabel" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <!-- TTS Hotkey Selection -->
+                                <TextBlock Text="Text-to-Speech Hotkey" Classes="label"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <ComboBox x:Name="TtsHotkeyComboBox" Classes="settings" Width="200">
+                                        <ComboBoxItem Content="Ctrl (or Cmd on Mac)" Tag="Ctrl"/>
+                                        <ComboBoxItem Content="Shift" Tag="Shift"/>
+                                        <ComboBoxItem Content="Alt (or Option on Mac)" Tag="Alt"/>
+                                    </ComboBox>
+                                    <TextBlock Text="+ same key (double-tap)" Classes="inlineLabel" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <!-- Conflict Warning -->
+                                <TextBlock x:Name="HotkeyConflictWarning"
+                                           Text="Warning: STT and TTS use the same key."
+                                           Foreground="#FFFFCC00"
+                                           IsVisible="False"
+                                           Margin="0,0,0,12"/>
+
+                                <!-- Timing Settings -->
+                                <Border Height="1" Background="#FF333333" Margin="0,4,0,12"/>
+                                <TextBlock Text="Timing" Classes="label" FontWeight="SemiBold"/>
+
                                 <StackPanel Classes="inputRow">
                                     <TextBlock Text="Double-tap interval" Classes="inlineLabel" Width="140"/>
                                     <TextBox x:Name="DoubleTapIntervalTextBox" Classes="settings" Width="100"/>
@@ -759,7 +792,7 @@
                                     <TextBlock Text="ms" Classes="inlineLabel" Margin="8,0,0,0"/>
                                 </StackPanel>
 
-                                <TextBlock Text="Double-tap Ctrl to start/stop dictation."
+                                <TextBlock Text="Note: Hotkey changes require an app restart."
                                            Classes="info" Margin="0,12,0,0"/>
                             </StackPanel>
                         </Border>
