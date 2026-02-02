@@ -62,6 +62,7 @@ public partial class OverlayViewModel : ViewModelBase
     private readonly AudioLevelMonitor _audioMonitor;
     private readonly DispatcherTimer _elapsedTimer;
     private readonly DispatcherTimer _temporaryMessageTimer;
+    private readonly DispatcherTimer _autoHideTimer;
     private DateTime _recordingStartTime;
     private string _savedTranscriptionText = string.Empty;
 
@@ -250,6 +251,10 @@ public partial class OverlayViewModel : ViewModelBase
         // Initialize temporary message timer
         _temporaryMessageTimer = new DispatcherTimer();
         _temporaryMessageTimer.Tick += OnTemporaryMessageTimerTick;
+
+        // Initialize auto-hide timer
+        _autoHideTimer = new DispatcherTimer();
+        _autoHideTimer.Tick += OnAutoHideTimerTick;
 
         // Load saved position
         WindowLeft = settingsService.Current.OverlayLeft;
@@ -567,6 +572,7 @@ public partial class OverlayViewModel : ViewModelBase
         DispatchToUI(() =>
         {
             TranscriptionText = string.IsNullOrEmpty(e.Text) ? "No speech detected" : e.Text;
+            StartAutoHideTimer();
         });
     }
 
@@ -606,6 +612,7 @@ public partial class OverlayViewModel : ViewModelBase
         // Start/stop audio level monitoring and elapsed timer based on listening state
         if (IsListening && !wasListening)
         {
+            _autoHideTimer.Stop(); // Cancel any pending auto-hide
             _audioMonitor.Start();
             TranscriptionText = "Listening...";
 
@@ -747,6 +754,8 @@ public partial class OverlayViewModel : ViewModelBase
     {
         DispatchToUI(() =>
         {
+            _autoHideTimer.Stop(); // Cancel any pending auto-hide
+
             // Save current transcription text
             _savedTranscriptionText = TranscriptionText;
 
@@ -822,6 +831,8 @@ public partial class OverlayViewModel : ViewModelBase
             TranscriptionText = spokenText;
             StatusText = "Ready";
             StatusColor = GrayBrush;
+
+            StartAutoHideTimer();
         });
     }
 
@@ -873,6 +884,40 @@ public partial class OverlayViewModel : ViewModelBase
     {
         _temporaryMessageTimer.Stop();
         TranscriptionText = _savedTranscriptionText;
+    }
+
+    private void OnAutoHideTimerTick(object? sender, EventArgs e)
+    {
+        _autoHideTimer.Stop();
+
+        // Don't hide if user is currently interacting with the overlay
+        if (IsUserInteracting) return;
+
+        // Don't hide if actively listening or speaking
+        if (IsListening || IsTtsSpeaking) return;
+
+        Hide();
+    }
+
+    /// <summary>
+    /// Starts the auto-hide timer if auto-hide is enabled in settings.
+    /// </summary>
+    private void StartAutoHideTimer()
+    {
+        var autoHideSeconds = _settingsService.Current.OverlayAutoHideSeconds;
+        if (autoHideSeconds <= 0) return; // 0 = never auto-hide
+
+        _autoHideTimer.Stop();
+        _autoHideTimer.Interval = TimeSpan.FromSeconds(autoHideSeconds);
+        _autoHideTimer.Start();
+    }
+
+    /// <summary>
+    /// Cancels any pending auto-hide timer.
+    /// </summary>
+    public void CancelAutoHide()
+    {
+        _autoHideTimer.Stop();
     }
 
     /// <summary>

@@ -74,9 +74,9 @@ public partial class SettingsWindow : Window
         // Language
         SelectComboBoxItemByTag(LanguageComboBox, settings.RecognitionLanguage);
 
-        // Hotkey settings - use new config format
-        SelectComboBoxItemByTag(SttHotkeyPresetComboBox, settings.SttHotkeyConfig);
-        SelectComboBoxItemByTag(TtsHotkeyPresetComboBox, settings.TtsHotkeyConfig);
+        // Hotkey settings - use new config format (match on key pattern, not timing)
+        SelectHotkeyComboBoxItem(SttHotkeyPresetComboBox, settings.SttHotkeyConfig);
+        SelectHotkeyComboBoxItem(TtsHotkeyPresetComboBox, settings.TtsHotkeyConfig);
         UpdateHotkeyConflictWarning();
 
         // Load timing settings from STT config (they're shared for display purposes)
@@ -93,6 +93,7 @@ public partial class SettingsWindow : Window
         AutoPasteCheckBox.IsChecked = settings.AutoPasteAfterCopy;
         StartMinimizedCheckBox.IsChecked = settings.StartMinimized;
         RunOnStartupCheckBox.IsChecked = settings.RunOnStartup;
+        SelectComboBoxItemByTag(OverlayAutoHideComboBox, settings.OverlayAutoHideSeconds.ToString());
 
         // Debugging
         EnableLoggingCheckBox.IsChecked = settings.EnableLogging;
@@ -203,6 +204,7 @@ public partial class SettingsWindow : Window
         StartMinimizedCheckBox.IsCheckedChanged += (s, e) => AutoSave();
         RunOnStartupCheckBox.IsCheckedChanged += (s, e) => AutoSave();
         AutoCheckUpdatesCheckBox.IsCheckedChanged += (s, e) => AutoSave();
+        OverlayAutoHideComboBox.SelectionChanged += (s, e) => AutoSave();
         EnableLoggingCheckBox.IsCheckedChanged += (s, e) => AutoSave();
         UseAzureFallbackCheckBox.IsCheckedChanged += (s, e) => AutoSave();
         FasterWhisperGpuCheckBox.IsCheckedChanged += (s, e) => { UpdateFasterWhisperGpuPanelVisibility(); AutoSave(); };
@@ -311,6 +313,10 @@ public partial class SettingsWindow : Window
             settings.AutoPasteAfterCopy = AutoPasteCheckBox.IsChecked ?? false;
             settings.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
             settings.RunOnStartup = RunOnStartupCheckBox.IsChecked ?? false;
+            if (int.TryParse(GetSelectedComboBoxTag(OverlayAutoHideComboBox), out var autoHideSeconds))
+            {
+                settings.OverlayAutoHideSeconds = autoHideSeconds;
+            }
 
             // Debugging
             settings.EnableLogging = EnableLoggingCheckBox.IsChecked ?? false;
@@ -416,6 +422,42 @@ public partial class SettingsWindow : Window
             {
                 comboBox.SelectedItem = item;
                 break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Selects a hotkey ComboBox item by matching the key pattern (ActivationType:PrimaryKey:Modifiers),
+    /// ignoring timing values which may differ from presets.
+    /// </summary>
+    private static void SelectHotkeyComboBoxItem(ComboBox comboBox, string savedConfig)
+    {
+        if (string.IsNullOrEmpty(savedConfig)) return;
+
+        // Extract the key pattern (first 3 parts: ActivationType:PrimaryKey:Modifiers)
+        var savedParts = savedConfig.Split(':');
+        if (savedParts.Length < 2) return;
+
+        var savedPattern = savedParts.Length >= 3
+            ? $"{savedParts[0]}:{savedParts[1]}:{savedParts[2]}"
+            : $"{savedParts[0]}:{savedParts[1]}:";
+
+        foreach (var item in comboBox.Items.Cast<ComboBoxItem>())
+        {
+            var itemTag = item.Tag?.ToString();
+            if (string.IsNullOrEmpty(itemTag)) continue;
+
+            var itemParts = itemTag.Split(':');
+            if (itemParts.Length < 2) continue;
+
+            var itemPattern = itemParts.Length >= 3
+                ? $"{itemParts[0]}:{itemParts[1]}:{itemParts[2]}"
+                : $"{itemParts[0]}:{itemParts[1]}:";
+
+            if (savedPattern == itemPattern)
+            {
+                comboBox.SelectedItem = item;
+                return;
             }
         }
     }

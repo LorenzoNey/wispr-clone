@@ -84,6 +84,7 @@ public class AppSettings
     public double OverlayOpacity { get; set; } = 0.9;
     public bool StartMinimized { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
+    public int OverlayAutoHideSeconds { get; set; } = 0; // 0 = never auto-hide
 
     // Behavior Settings
     public bool AutoCopyToClipboard { get; set; } = false;

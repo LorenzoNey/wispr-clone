@@ -224,6 +224,22 @@
                                 <CheckBox x:Name="AutoCheckUpdatesCheckBox"
                                           Content="Check for updates automatically"
                                           Classes="settings"/>
+
+                                <!-- Overlay auto-hide setting -->
+                                <StackPanel Classes="inputRow" Margin="0,12,0,0">
+                                    <TextBlock Text="Hide overlay after" Classes="inlineLabel" Width="100"/>
+                                    <ComboBox x:Name="OverlayAutoHideComboBox" Classes="settings" Width="140">
+                                        <ComboBoxItem Content="Never" Tag="0"/>
+                                        <ComboBoxItem Content="3 seconds" Tag="3"/>
+                                        <ComboBoxItem Content="5 seconds" Tag="5"/>
+                                        <ComboBoxItem Content="10 seconds" Tag="10"/>
+                                        <ComboBoxItem Content="30 seconds" Tag="30"/>
+                                        <ComboBoxItem Content="1 minute" Tag="60"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <TextBlock Text="Auto-hide overlay after transcription completes (0 = stay visible)"
+                                           Classes="info"
+                                           Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
