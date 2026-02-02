@@ -8,8 +8,8 @@ A **cross-platform** AI-powered speech-to-text and text-to-speech application. P
 ## Features
 
 - **Cross-Platform**: Runs on Windows, macOS, and Linux
-- **Speech-to-Text (STT)**: Multiple providers including Windows offline, Azure Speech, OpenAI Whisper, and local Faster-Whisper
-- **Text-to-Speech (TTS)**: Read clipboard text aloud with providers like Windows SAPI, Azure, OpenAI, and Piper
+- **Speech-to-Text (STT)**: Local AI-powered transcription using Whisper, plus Windows offline recognition
+- **Text-to-Speech (TTS)**: Read clipboard text aloud with local Piper voices or system voices
 - **Floating Overlay**: Semi-transparent overlay window showing real-time transcription with auto-scroll
 - **Global Hotkeys**: Customizable hotkeys for STT (Ctrl+Ctrl) and TTS (Shift+Shift)
 - **System Tray**: Runs in the background with dynamic tray icon showing current state
@@ -61,9 +61,7 @@ A **cross-platform** AI-powered speech-to-text and text-to-speech application. P
 
 ### All Platforms
 - Microphone (for STT)
-- For cloud recognition:
-  - Azure Speech Service subscription, or
-  - OpenAI API key
+- No API keys required - uses local AI models
 
 ### Platform-Specific
 - **Windows**: Windows 10/11 (x64 or ARM64)
@@ -74,22 +72,16 @@ A **cross-platform** AI-powered speech-to-text and text-to-speech application. P
 
 | Provider | Windows | macOS | Linux | Streaming |
 |----------|---------|-------|-------|-----------|
-| Offline (System.Speech) | Yes | No | No | Yes |
-| Azure Speech Service | Yes | Yes | Yes | Yes |
-| OpenAI Whisper (Batch) | Yes | Yes | Yes | No* |
+| Whisper Server (Local) | Yes | Yes | Yes | Yes |
 | Faster-Whisper (Local) | Yes | No | No | Yes |
-| Whisper Server (Local) | Yes | No | No | Yes |
-
-\* Whisper re-transcribes entire audio every 2 seconds (pseudo-streaming)
+| Offline (System.Speech) | Yes | No | No | Yes |
 
 ### TTS Provider Availability
 
 | Provider | Windows | macOS | Linux |
 |----------|---------|-------|-------|
-| Windows SAPI | Yes | No | No |
-| Azure TTS | Yes | Yes | Yes |
-| OpenAI TTS | Yes | Yes | Yes |
 | Piper (Local) | Yes | Yes | Yes |
+| Windows SAPI | Yes | No | No |
 | macOS Native | No | Yes | No |
 
 ## Usage
@@ -124,19 +116,7 @@ Actions:
 
 Settings are organized into tabs: **General**, **STT**, **TTS**, and **Advanced**.
 
-### Cloud Service Setup
-
-#### Azure Speech Service
-1. Create an [Azure Speech Service resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices)
-2. Copy your subscription key and region (e.g., `eastus`, `westeurope`)
-3. Open Settings and select "Azure" as the speech provider
-4. Enter your subscription key and region
-
-#### OpenAI Whisper/TTS
-
-1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Open Settings and enter your OpenAI API key
-3. Select **OpenAI Whisper** as the STT provider or **OpenAI TTS** as the TTS provider
+Access settings via the system tray icon → Settings, or click the gear icon in the overlay.
 
 ## Building from Source
 

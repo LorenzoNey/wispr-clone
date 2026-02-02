@@ -643,7 +643,7 @@ jobs:
           body: |
             ## AITextVoice v${{ steps.version.outputs.VERSION }}
 
-            AI-powered speech-to-text and text-to-speech application powered by Azure Speech Services and OpenAI Whisper.
+            AI-powered speech-to-text and text-to-speech application with local processing using Whisper and Piper.
 
             ### Downloads
 
