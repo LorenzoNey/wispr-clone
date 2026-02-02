@@ -47,6 +47,34 @@
                        TextAlignment="Center"
                        Margin="0,0,0,16"/>
 
+            <!-- Help Links -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,16">
+                <Button x:Name="UserGuideButton"
+                        Content="User Guide"
+                        Background="Transparent"
+                        Foreground="#FF3391FF"
+                        BorderThickness="0"
+                        Padding="8,4"
+                        FontSize="12"
+                        Cursor="Hand"
+                        Click="UserGuideButton_Click"/>
+                <TextBlock Text="|"
+                           Foreground="#FF404040"
+                           VerticalAlignment="Center"
+                           Margin="4,0"/>
+                <Button x:Name="GitHubButton"
+                        Content="GitHub"
+                        Background="Transparent"
+                        Foreground="#FF3391FF"
+                        BorderThickness="0"
+                        Padding="8,4"
+                        FontSize="12"
+                        Cursor="Hand"
+                        Click="GitHubButton_Click"/>
+            </StackPanel>
+
             <!-- Update Section -->
             <Border Background="#FF2D2D2D"
                     CornerRadius="6"

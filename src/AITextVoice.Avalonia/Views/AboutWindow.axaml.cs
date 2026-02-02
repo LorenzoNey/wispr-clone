@@ -128,4 +128,31 @@ public partial class AboutWindow : Window
     {
         Close();
     }
+
+    private void UserGuideButton_Click(object? sender, RoutedEventArgs e)
+    {
+        OpenUrl("https://github.com/LorenzoNey/aitextvoice/blob/main/docs/USER_GUIDE.md");
+    }
+
+    private void GitHubButton_Click(object? sender, RoutedEventArgs e)
+    {
+        OpenUrl("https://github.com/LorenzoNey/aitextvoice");
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch
+        {
+            // Silently fail if unable to open browser
+        }
+    }
 }

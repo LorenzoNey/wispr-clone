@@ -481,6 +481,10 @@ public partial class App : Application
         aboutItem.Click += (_, _) => SafeExecute(() => viewModel.OpenAboutCommand.Execute(null), "Open About");
         _trayMenu.Items.Add(aboutItem);
 
+        var helpItem = new NativeMenuItem("Help / User Guide");
+        helpItem.Click += (_, _) => SafeExecute(() => OpenUserGuide(), "Open Help");
+        _trayMenu.Items.Add(helpItem);
+
         // Note: Update separator and menu item will be added dynamically when an update is available
 
         _trayMenu.Items.Add(new NativeMenuItemSeparator());
@@ -505,6 +509,25 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log($"Error in {actionName}: {ex.Message}");
+        }
+    }
+
+    private void OpenUserGuide()
+    {
+        const string userGuideUrl = "https://github.com/LorenzoNey/aitextvoice/blob/main/docs/USER_GUIDE.md";
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = userGuideUrl,
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+            Log($"Opened user guide: {userGuideUrl}");
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to open user guide: {ex.Message}");
         }
     }
 
